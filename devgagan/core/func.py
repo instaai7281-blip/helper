@@ -206,10 +206,8 @@ def hhmmss(seconds):
     return time.strftime('%H:%M:%S',time.gmtime(seconds))
 
 async def screenshot(video, duration, sender):
-    if os.path.exists(f'{sender}.jpg'):
-        return f'{sender}.jpg'
     time_stamp = hhmmss(int(duration)/2)
-    out = dt.now().isoformat("_", "seconds") + ".jpg"
+    out = f"thumb_{sender}_{int(time.time())}.jpg"
     cmd = ["ffmpeg",
            "-ss",
            f"{time_stamp}", 

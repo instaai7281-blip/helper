@@ -187,39 +187,11 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
             if not thumb_path:
                 # Generate a thumbnail from the video using ffmpeg (fallback to screenshot())
 
-                thumb_path = os.path.join(THUMBNAIL_DIR, f"{sender}.jpg")
                 try:
-                    # pick a seek time: middle of video or 1s minimum
-                    try:
-                        dur = int(duration)
-                    except Exception:
-                        dur = int(metadata.get('duration', 0) or 0)
-                    seek_time = max(1, dur // 2) if dur > 2 else 1
-
-                    if shutil.which("ffmpeg"):
-                        cmd = [
-                            "ffmpeg",
-                            "-hide_banner", "-loglevel", "error",
-                            "-ss", str(seek_time),
-                            "-i", file,
-                            "-vframes", "1",
-                            "-q:v", "2",
-                            thumb_path
-                        ]
-                        # run blocking ffmpeg in a thread to avoid blocking the loop
-                        await asyncio.to_thread(subprocess.run, cmd, check=True)
-                        if not os.path.exists(thumb_path):
-                            # ffmpeg didn't produce file -> fallback
-                            thumb_path = await screenshot(file, duration, sender)
-                    else:
-                        # ffmpeg not available -> use existing screenshot helper
-                        thumb_path = await screenshot(file, duration, sender)
+                    # Generate unique temp thumb
+                    thumb_path = await screenshot(file, duration, sender)
                 except Exception:
-                    # any error -> fallback to screenshot helper
-                    try:
-                        thumb_path = await screenshot(file, duration, sender)
-                    except Exception:
-                        thumb_path = None
+                    thumb_path = None
 
         ext = file.split('.')[-1].lower()
         raw_name = os.path.basename(file)
@@ -357,13 +329,18 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
 
             )
 
+            # Generate thumbnail once
+            thumb_path = thumbnail(sender)
+            if not thumb_path:
+                thumb_path = await screenshot(file, duration, sender)
+
             await gf.send_file(
                 target_chat_id,
                 uploaded,
                 caption=caption_html,
                 attributes=attributes,
                 reply_to=topic_id,
-                thumb_path = thumbnail(sender) or await screenshot(file, duration, sender)
+                thumb=thumb_path
             )
 
             await gf.send_file(
@@ -371,7 +348,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 uploaded,
                 caption=log_caption,
                 attributes=attributes,
-                thumb_path = thumbnail(sender) or await screenshot(file, duration, sender)
+                thumb=thumb_path
             )
 
     except Exception as e:
@@ -1252,7 +1229,10 @@ async def handle_large_file(file, sender, edit, caption):
 
     finally:
         await edit.delete()
-        os.remove(file)
+        if os.path.exists(file):
+            os.remove(file)
+        if thumb_path and os.path.exists(thumb_path):
+            os.remove(thumb_path)
         gc.collect()
         return
 

@@ -427,6 +427,8 @@ async def process_video(client, event, url, cookies_env_var, check_duration_and_
             os.remove(temp_cookie_path)
         if thumbnail_file and os.path.exists(thumbnail_file):
             os.remove(thumbnail_file)
+        if THUMB and os.path.exists(THUMB):
+            os.remove(THUMB)
  
 
 async def split_and_upload_file(app, sender, file_path, caption):
