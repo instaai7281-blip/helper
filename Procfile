@@ -1,1 +1,1 @@
-worker: python -m devgagan
+web: python3 main.py

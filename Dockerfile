@@ -34,4 +34,4 @@ COPY . .
 EXPOSE 5000
 
 # Run Flask + Python module
-CMD flask run -h 0.0.0.0 -p 5000 & python3 -m devgagan
+CMD ["python3", "main.py"]
