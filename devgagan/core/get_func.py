@@ -242,8 +242,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                 dm = await app.send_photo(
                     chat_id=target_chat_id,
                     photo=file,
-                    caption=caption,
-                    parse_mode=ParseMode.MARKDOWN,
+                    caption=None,
                     progress=progress_bar,
                     reply_to_message_id=topic_id,
                     progress_args=("╔══━⚡️Uploading...⚡️━══╗\n", edit, time.time())
@@ -454,7 +453,7 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         if msg.photo:
             if not await is_enabled(sender, "photo"):
                 return
-            result = await app.send_photo(target_chat_id, file, caption=caption, reply_to_message_id=topic_id)
+            result = await app.send_photo(target_chat_id, file, caption=None, reply_to_message_id=topic_id)
             await result.copy(LOG_GROUP)
             await edit.delete(1)
             return
@@ -632,7 +631,7 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
             file = await rename_file(file, sender)
 
             if msg.photo:
-                result = await app.send_photo(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
+                result = await app.send_photo(target_chat_id, file, caption=None, reply_to_message_id=topic_id)
             elif msg.video or msg.document:
                 freecheck = await chk_user(None, sender) # Modified for simplicity, adjust if necessary
                 file_size = get_message_file_size(msg)
@@ -710,7 +709,7 @@ async def send_media_message(app, target_chat_id, msg, caption, topic_id):
             return await app.send_photo(
                 target_chat_id,
                 msg.photo.file_id,
-                caption=caption,
+                caption=None,
                 reply_to_message_id=topic_id,
             )
 
