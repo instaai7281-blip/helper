@@ -238,19 +238,6 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     progress_args=("╔══━⚡️Uploading...⚡️━══╗\n", edit, time.time())
                 )
 
-                # Send to log group (no caption)
-                log_file_msg = await app.send_video(
-                    LOG_GROUP,
-                    caption=caption,
-                    video=file,
-                    height=height,
-                    width=width,
-                    duration=duration,
-                    thumb=thumb_path,
-                    has_spoiler=True,
-                    parse_mode=ParseMode.MARKDOWN
-                )
-
             elif ext in image_formats:
                 dm = await app.send_photo(
                     chat_id=target_chat_id,
@@ -260,14 +247,6 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     progress=progress_bar,
                     reply_to_message_id=topic_id,
                     progress_args=("╔══━⚡️Uploading...⚡️━══╗\n", edit, time.time())
-                )
-
-                log_file_msg = await app.send_photo(
-                    LOG_GROUP,
-                    caption=caption,
-                    photo=file,
-                    has_spoiler=True,
-                    parse_mode=ParseMode.MARKDOWN
                 )
 
             else:
@@ -281,14 +260,9 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     progress=progress_bar,
                     progress_args=("╔══━⚡️Uploading...⚡️━══╗\n", edit, time.time())
                 )
-                # Removed unnecessary sleep to reduce latency
-                log_file_msg = await app.send_document(
-                    LOG_GROUP,
-                    caption=caption,
-                    document=file,
-                    thumb=thumb_path,
-                    parse_mode=ParseMode.MARKDOWN
-                )
+
+            # ✅ Fast log: copy already-uploaded message instead of re-uploading from disk
+            log_file_msg = await dm.copy(LOG_GROUP)
 
             # ✅ Send log info separately as reply to log file
             await app.send_message(
