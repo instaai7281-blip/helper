@@ -542,7 +542,7 @@ async def get_final_caption(msg, sender):
     final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
 
     # ✅ Remove unwanted branding
-    final_caption = re.sub(r'(?i)team\s*jnc', '', final_caption)
+    final_caption = re.sub(r'(?i)team[\s_\-\.]*jnc', '', final_caption)
     final_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', final_caption)
 
     # Replace @mentions with bold Stolen Happiness
@@ -760,7 +760,7 @@ def format_caption(original_caption, sender, custom_caption):
     #original_caption = replace_fancy_and_emoji(original_caption)
 
     # ✅ Remove unwanted branding
-    original_caption = re.sub(r'(?i)team\s*jnc', '', original_caption)
+    original_caption = re.sub(r'(?i)team[\s_\-\.]*jnc', '', original_caption)
     original_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', original_caption)
 
     # ✅ Remove all hashtags like #Movie
@@ -1290,7 +1290,7 @@ async def rename_file(file, sender, caption=None):
 
     # Apply text transformations
     base_name = re.sub(r'@\w+', '@Chosen_Onex', base_name)  # Replace mentions
-    base_name = re.sub(r'(?i)team\s*jnc', '', base_name)  # Remove team jnc
+    base_name = re.sub(r'(?i)team[\s_\-\.]*jnc', '', base_name)  # Remove team jnc
     base_name = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', base_name)  # Remove study vault
     for word in delete_words:
         base_name = base_name.replace(word, "")  # Remove banned words
