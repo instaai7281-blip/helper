@@ -206,7 +206,9 @@ def hhmmss(seconds):
     return time.strftime('%H:%M:%S',time.gmtime(seconds))
 
 async def screenshot(video, duration, sender):
-    time_stamp = hhmmss(int(duration)/2)
+    # Ensure we seek to at least 1 second in, even for short videos
+    seek_time = max(int(duration) // 2, 1)
+    time_stamp = hhmmss(seek_time)
     out = f"thumb_{sender}_{int(time.time())}.jpg"
     cmd = ["ffmpeg",
            "-ss",
@@ -223,18 +225,23 @@ async def screenshot(video, duration, sender):
            f"{out}",
            "-y"
           ]
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-    x = stderr.decode().strip()
-    y = stdout.decode().strip()
-    if os.path.isfile(out):
-        return out
-    else:
-        None  
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate()
+        if process.returncode != 0:
+            print(f"FFmpeg screenshot failed (code {process.returncode}): {stderr.decode().strip()[-200:]}")
+        if os.path.isfile(out):
+            return out
+        else:
+            print(f"Thumbnail file not created for {video}")
+            return None
+    except Exception as e:
+        print(f"Screenshot exception: {e}")
+        return None
 last_update_time = time.time()
 async def progress_callback(current, total, progress_message):
     percent = (current / total) * 100

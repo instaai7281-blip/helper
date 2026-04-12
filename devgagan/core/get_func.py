@@ -451,13 +451,12 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         file_name = await get_media_filename(msg)
         edit = await app.edit_message_text(sender, edit_id, "**>Downloading...Darling 😘**")
 
-        # Optimized fast download
-        file = await fast_download(
-            userbot,
+        # Download media
+        file = await userbot.download_media(
             msg,
-            reply=edit,
-            name=file_name,
-            progress_bar_function=lambda done, total: progress_callback(done, total, edit)
+            file_name=file_name,            
+            progress_args=("╔══━⚡️ Downloading ⚡️━══╗\n", edit, time.time()),
+            progress=progress_bar
         )
         
         caption = await get_final_caption(msg, sender)
