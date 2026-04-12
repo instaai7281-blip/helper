@@ -541,8 +541,12 @@ async def get_final_caption(msg, sender):
     custom_caption = get_user_caption_preference(sender)
     final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
 
-    # Replace @mentions with @Real_Pirates
-    final_caption = re.sub(r'@\w+', '🖤', final_caption)
+    # ✅ Remove unwanted branding
+    final_caption = re.sub(r'(?i)team\s*jnc', '', final_caption)
+    final_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', final_caption)
+
+    # Replace @mentions with bold Stolen Happiness
+    final_caption = re.sub(r'@\w+', '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**', final_caption)
 
     # Replace all links with your channel link
     final_caption = re.sub(r'https?://\S+|www\.\S+', '🖤', final_caption)
@@ -755,11 +759,15 @@ def format_caption(original_caption, sender, custom_caption):
     # ✅ Clean fancy characters and replace emojis
     #original_caption = replace_fancy_and_emoji(original_caption)
 
+    # ✅ Remove unwanted branding
+    original_caption = re.sub(r'(?i)team\s*jnc', '', original_caption)
+    original_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', original_caption)
+
     # ✅ Remove all hashtags like #Movie
     original_caption = re.sub(r'#\S+', '', original_caption)
 
     # ✅ Replace @mentions
-    original_caption = re.sub(r'@\w+', '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss**', original_caption)
+    original_caption = re.sub(r'@\w+', '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**', original_caption)
 
     # ✅ Replace telegram links
     original_caption = re.sub(
@@ -1282,6 +1290,8 @@ async def rename_file(file, sender, caption=None):
 
     # Apply text transformations
     base_name = re.sub(r'@\w+', '@Chosen_Onex', base_name)  # Replace mentions
+    base_name = re.sub(r'(?i)team\s*jnc', '', base_name)  # Remove team jnc
+    base_name = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', base_name)  # Remove study vault
     for word in delete_words:
         base_name = base_name.replace(word, "")  # Remove banned words
     for word, replace_word in replacements.items():
