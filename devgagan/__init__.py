@@ -36,15 +36,16 @@ app = Client(
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
-    workers=100, # Increased workers for better speed
-    parse_mode=ParseMode.MARKDOWN
+    workers=40,
+    parse_mode=ParseMode.MARKDOWN,
+    sleep_threshold=60
 )
 
 # Multi-client pool for balancing
 pro_clients = []
 if STRINGS:
     for i, session in enumerate(STRINGS):
-        pro_clients.append(Client(f"pro_client_{i}", api_id=API_ID, api_hash=API_HASH, session_string=session, workers=50))
+        pro_clients.append(Client(f"pro_client_{i}", api_id=API_ID, api_hash=API_HASH, session_string=session, workers=20, sleep_threshold=60))
     pro = pro_clients[0] # Backward compatibility
 else:
     pro = None

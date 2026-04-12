@@ -215,6 +215,10 @@ async def screenshot(video, duration, sender):
            f"{video}",
            "-frames:v",
            "1", 
+           "-preset",
+           "ultrafast",
+           "-threads",
+           "1",
            f"{out}",
            "-y"
           ]

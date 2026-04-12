@@ -34,7 +34,7 @@ from pyrogram.types import Message
 from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, STRINGS, API_ID, API_HASH
 from devgagan.core.mongo import db as odb
 from telethon import TelegramClient, events, Button
-from devgagantools import fast_upload
+from devgagantools import fast_upload, fast_download
 from datetime import datetime
 import asyncio
 import unicodedata
@@ -281,7 +281,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     progress=progress_bar,
                     progress_args=("╔══━⚡️Uploading...⚡️━══╗\n", edit, time.time())
                 )
-                await asyncio.sleep(2)
+                # Removed unnecessary sleep to reduce latency
                 log_file_msg = await app.send_document(
                     LOG_GROUP,
                     caption=caption,
@@ -451,12 +451,13 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         file_name = await get_media_filename(msg)
         edit = await app.edit_message_text(sender, edit_id, "**>Downloading...Darling 😘**")
 
-        # Download media
-        file = await userbot.download_media(
+        # Optimized fast download
+        file = await fast_download(
+            userbot,
             msg,
-            file_name=file_name,            
-            progress_args=("╔══━⚡️ Downloading ⚡️━══╗\n", edit, time.time()),
-            progress=progress_bar
+            reply=edit,
+            name=file_name,
+            progress_bar_function=lambda done, total: progress_callback(done, total, edit)
         )
         
         caption = await get_final_caption(msg, sender)
