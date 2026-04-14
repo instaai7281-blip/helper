@@ -345,46 +345,67 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         size_limit = 2 * 1024 * 1024 * 1024  # 1.99 GB size limit
         file = ''
         edit = ''
-        # Extract chat and message ID for valid Telegram links
+        # Extract chat and message ID for various Telegram link formats
         if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
             parts = msg_link.split("/")
             if 't.me/b/' in msg_link:
                 chat = parts[-2]
-                msg_id = int(parts[-1]) + i # fixed bot problem 
+                msg_id = int(parts[-1]) + i
             else:
                 chat = int('-100' + parts[parts.index('c') + 1])
                 msg_id = int(parts[-1]) + i
-
-            if chat in saved_channel_ids:
-                await app.edit_message_text(
-                    message.chat.id, edit_id,
-                    "This channel is protected by **__CHOSEN ONE ⚝__💀**.\Kya Be... Hamara Hi Content Nikalega 🌝 Kahi Or Try Kar 😘"
-                )
+        elif 'tg://openmessage' in msg_link:
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(msg_link)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            chat = params.get("user_id", [None])[0]
+            msg_id = int(params.get("message_id", [0])[0]) + i
+            if chat and (chat.isdigit() or chat.startswith("-")):
+                chat = int(chat)
+        elif 't.me/' in msg_link:
+            if '/s/' in msg_link: # handles stories
+                edit = await app.edit_message_text(sender, edit_id, "Story Link Detected...")
+                if userbot is None:
+                    await edit.edit("Login in bot to save stories...")     
+                    return
+                parts = msg_link.split("/")
+                chat = parts[3]
+                if chat.isdigit():
+                    chat = f"-100{chat}"
+                msg_id = int(parts[-1])
+                await download_user_stories(userbot, chat, msg_id, edit, sender)
+                await edit.delete(2)
                 return
             
-        elif '/s/' in msg_link: # fixed story typo
-            edit = await app.edit_message_text(sender, edit_id, "Story Link Dictected...")
-            if userbot is None:
-                await edit.edit("Login in bot save stories...")     
-                return
-            parts = msg_link.split("/")
-            chat = parts[3]
-            
-            if chat.isdigit():   # this is for channel stories
-                chat = f"-100{chat}"
-            
-            msg_id = int(parts[-1])
-            await download_user_stories(userbot, chat, msg_id, edit, sender)
-            await edit.delete(2)
-            return
-        
+            # Public links, Forum/Topic links
+            parts = msg_link.split("t.me/")[1].split("/")
+            chat = parts[0]
+            msg_id = int(parts[-1]) + i
         else:
-            edit = await app.edit_message_text(sender, edit_id, "Public link detected...🌝")
-            chat = msg_link.split("t.me/")[1].split("/")[0]
-            msg_id = int(msg_link.split("/")[-1])
-            await copy_message_with_chat_id(app, userbot, sender, chat, msg_id, edit)
-            await edit.delete(2)
+            chat = None
+            msg_id = None
+
+        if not chat or not msg_id:
             return
+
+        # Check if the channel is protected
+        if chat in saved_channel_ids:
+            await app.edit_message_text(
+                message.chat.id, edit_id,
+                "This channel is protected by **__CHOSEN ONE ⚝__💀**.\nKya Be... Hamara Hi Content Nikalega 🌝 Kahi Or Try Kar 😘"
+            )
+            return
+
+        # For public links, try copying first (faster/safer)
+        if not ('t.me/c/' in msg_link or 't.me/b/' in msg_link or 'tg://openmessage' in msg_link):
+            edit = await app.edit_message_text(sender, edit_id, "Processing link...🌝")
+            copy_success = await copy_message_with_chat_id(app, userbot, sender, chat, msg_id, edit)
+            if copy_success:
+                await edit.delete(2)
+                return
+            # If copy fails, fallback to extraction logic below
+            await edit.edit("**Copy failed, trying extraction...**")
+
             
         # Fetch the target message
         msg = await userbot.get_messages(chat, msg_id)
@@ -596,72 +617,92 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
     size_limit = 2 * 1024 * 1024 * 1024  # 2 GB size limit
 
     try:
+        # Try copying using the main bot first
         msg = await app.get_messages(chat_id, message_id)
+        if not msg or msg.empty:
+            raise Exception("Message not found or empty")
+
         custom_caption = get_user_caption_preference(sender)
         final_caption = format_caption(msg.caption or '', sender, custom_caption)
 
-        # Parse target_chat_id and topic_id
         topic_id = None
         if '/' in str(target_chat_id):
             target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
 
-        # Handle different media types
         if msg.media:
             result = await send_media_message(app, target_chat_id, msg, final_caption, topic_id)
-            return
         elif msg.text:
             result = await app.copy_message(target_chat_id, chat_id, message_id, reply_to_message_id=topic_id)
-            return
+        
+        if result:
+            return True
 
-        # Fallback if result is None
-        if result is None:
-            await edit.edit("Trying if it is a group...")
-            chat_id = (await userbot.get_chat(f"@{chat_id}")).id
-            msg = await userbot.get_messages(chat_id, message_id)
+    except Exception as e:
+        print(f"App copy failed: {e}")
 
-            if not msg or msg.service or msg.empty:
-                return
+    # Fallback to userbot if app copy fails
+    if userbot:
+        try:
+            await edit.edit("Trying extraction via userbot... ⚡")
+            
+            # Resolve chat_id if it's a username string
+            if isinstance(chat_id, str) and not chat_id.startswith("-") and not chat_id.isdigit():
+                try:
+                    chat_entity = await userbot.get_entity(chat_id)
+                    resolved_chat_id = chat_entity.id
+                except Exception:
+                    resolved_chat_id = chat_id
+            else:
+                resolved_chat_id = chat_id
+
+            msg = await userbot.get_messages(resolved_chat_id, message_id)
+            if not msg or msg.empty:
+                return False
 
             if msg.text:
                 await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
-                return
+                return True
 
+            custom_caption = get_user_caption_preference(sender)
             final_caption = format_caption(msg.caption.markdown if msg.caption else "", sender, custom_caption)
+            
             file = await userbot.download_media(
                 msg,
                 progress=progress_bar,
                 progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
             )
+            if not file:
+                return False
+
             file = await rename_file(file, sender)
+            file_size = os.path.getsize(file)
 
             if msg.photo:
-                result = await app.send_photo(target_chat_id, file, caption=None, reply_to_message_id=topic_id)
+                await app.send_photo(target_chat_id, file, caption=None, reply_to_message_id=topic_id)
             elif msg.video or msg.document:
-                freecheck = await chk_user(None, sender) # Modified for simplicity, adjust if necessary
-                file_size = get_message_file_size(msg)
+                freecheck = await chk_user(None, sender)
                 if file_size > size_limit and (freecheck == 0 or pro is None):
-                    await edit.delete()
                     await split_and_upload_file(app, sender, target_chat_id, file, final_caption, topic_id)
-                    return       
                 elif file_size > size_limit:
                     await handle_large_file(file, sender, edit, final_caption)
-                    return
-                await upload_media(sender, target_chat_id, file, final_caption, edit, topic_id)
+                else:
+                    await upload_media(sender, target_chat_id, file, final_caption, edit, topic_id)
             elif msg.audio:
-                result = await app.send_audio(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
+                await app.send_audio(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
             elif msg.voice:
-                result = await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+                await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
             elif msg.sticker:
-                result = await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
-            else:
-                await edit.edit("Unsupported media type.")
-
-    except Exception as e:
-        print(f"Error : {e}")
-        pass
-        #error_message = f"Error occurred while processing message: {str(e)}"
-        # await app.send_message(sender, error_message)
-        # await app.send_message(sender, f"Make Bot admin in your Channel - {target_chat_id} and restart the process after /cancel")
+                await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
+            
+            return True
+        except Exception as e:
+            print(f"Userbot extraction failed: {e}")
+            return False
+        finally:
+            if file and os.path.exists(file):
+                os.remove(file)
+    
+    return False
 
     finally:
         if file and os.path.exists(file):
