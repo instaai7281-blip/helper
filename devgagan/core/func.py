@@ -15,7 +15,7 @@
 import math
 import time , re
 from pyrogram import enums
-from config import CHANNEL_ID, OWNER_ID 
+from config import CHANNEL_ID, OWNER_ID, THUMBNAIL_DIR 
 from devgagan.core.mongo.plans_db import premium_users
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import cv2
@@ -318,3 +318,7 @@ async def prog_bar(current, total, ud_type, message, start):
 
         except:
             pass
+d e f   t h u m b n a i l ( s e n d e r ) : 
+         p a t h   =   o s . p a t h . j o i n ( T H U M B N A I L _ D I R ,   f ' { s e n d e r } . j p g ' ) 
+         r e t u r n   p a t h   i f   o s . p a t h . e x i s t s ( p a t h )   e l s e   N o n e  
+ 

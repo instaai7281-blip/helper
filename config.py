@@ -36,3 +36,8 @@ YT_COOKIES = getenv("YT_COOKIES", YTUB_COOKIES)
 INSTA_COOKIES = getenv("INSTA_COOKIES", INST_COOKIES)
 # Optimization: Number of concurrent tasks
 MAX_CONCURRENT_TASKS = int(getenv("MAX_CONCURRENT_TASKS", "10"))
+
+import os
+THUMBNAIL_DIR = os.path.abspath("./thumbnails")
+if not os.path.exists(THUMBNAIL_DIR):
+    os.makedirs(THUMBNAIL_DIR, exist_ok=True)

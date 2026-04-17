@@ -31,7 +31,7 @@ from pyrogram.enums import MessageMediaType, ParseMode
 from devgagan.core.func import *
 from pyrogram.errors import RPCError
 from pyrogram.types import Message
-from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, STRINGS, API_ID, API_HASH
+from config import MONGO_DB as MONGODB_CONNECTION_STRING, LOG_GROUP, OWNER_ID, STRING, STRINGS, API_ID, API_HASH, THUMBNAIL_DIR
 from devgagan.core.mongo import db as odb
 from telethon import TelegramClient, events, Button
 from devgagantools import fast_upload, fast_download
@@ -72,15 +72,6 @@ def clean_filename(text):
     return text.strip()
 
 
-
-def thumbnail(sender):
-    path = os.path.join(THUMBNAIL_DIR, f"{sender}.jpg")
-    return path if os.path.exists(path) else None
-
-
-
-THUMBNAIL_DIR = os.path.abspath("./thumbnails")
-os.makedirs(THUMBNAIL_DIR, exist_ok=True)
 
 # MongoDB database name and collection name
 DB_NAME = "smart_users"
