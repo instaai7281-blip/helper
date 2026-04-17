@@ -472,6 +472,10 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
             progress=progress_bar
         )
         
+        if not file:
+            await edit.edit("❌ **Download failed** - The file might be corrupted or the bot's session has expired.")
+            return
+
         caption = await get_final_caption(msg, sender)
 
         # Rename file
@@ -1333,10 +1337,13 @@ async def rename_file(file, sender, caption=None):
     replacements = load_replacement_words(sender)
     custom_rename_tag = get_user_rename_preference(sender)
 
-    # Split filename into name + extension
-    base_name, ext = os.path.splitext(file)
+    # Separate directory and filename
+    directory = os.path.dirname(file)
+    filename = os.path.basename(file)
+    base_name, ext = os.path.splitext(filename)
+    
     ext = ext if ext and len(ext) <= 6 else ".mp4"
-    original_base = os.path.basename(base_name)
+    original_base = base_name
 
     # Use caption if filename is empty/generic
     if not original_base.strip() or original_base.lower() in ['untitled', 'noname', 'video', 'image']:
@@ -1366,15 +1373,17 @@ async def rename_file(file, sender, caption=None):
     base_name = strip_unicode_junk(base_name)
 
     # Final filename assembly
-    new_file_name = f"{base_name.strip()} {custom_rename_tag}{ext}".strip()
+    new_filename = f"{base_name.strip()} {custom_rename_tag}{ext}".strip()
     
     # Ensure filename isn't empty after processing
-    if not os.path.splitext(new_file_name)[0]:
-        new_file_name = f"document_{int(time.time())}{ext}"
+    if not os.path.splitext(new_filename)[0]:
+        new_filename = f"document_{int(time.time())}{ext}"
+
+    new_file_path = os.path.join(directory, new_filename)
 
     # Perform the rename
-    await asyncio.to_thread(os.rename, file, new_file_name)
-    return new_file_name
+    await asyncio.to_thread(os.rename, file, new_file_path)
+    return new_file_path
 
 
 def progress_callback(done, total, user_id):
