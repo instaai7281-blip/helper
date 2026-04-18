@@ -279,7 +279,6 @@ async def progress_callback(current, total, progress_message):
     f"**__Pwrd by CHOSEN ONE ⚝__**"
         )
 
-        last_update_time = current_time
 async def prog_bar(current, total, ud_type, message, start):
 
     now = time.time()
@@ -318,7 +317,6 @@ async def prog_bar(current, total, ud_type, message, start):
 
         except:
             pass
-d e f   t h u m b n a i l ( s e n d e r ) : 
-         p a t h   =   o s . p a t h . j o i n ( T H U M B N A I L _ D I R ,   f ' { s e n d e r } . j p g ' ) 
-         r e t u r n   p a t h   i f   o s . p a t h . e x i s t s ( p a t h )   e l s e   N o n e  
- 
+def thumbnail(sender):
+    path = os.path.join(THUMBNAIL_DIR, f'{sender}.jpg')
+    return path if os.path.exists(path) else None
