@@ -172,10 +172,20 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         thumb_path = thumbnail(sender)
 
         # ✅ Fallback to auto-screenshot ONLY if it's a video and NO custom thumb exists
+        # REPLACE THIS in devgagan/core/get_func.py (Line 175-179)
+
         if not thumb_path and file.lower().endswith(tuple(VIDEO_EXTENSIONS)):
             try:
+                print(f"[DEBUG] Trying to create thumbnail for: {file}, duration: {duration}")
                 thumb_path = await screenshot(file, duration, sender)
-            except Exception:
+                if not thumb_path:
+                    print(f"[ERROR] Screenshot returned None for user {sender}")
+                else:
+                    print(f"[SUCCESS] Thumbnail created: {thumb_path}")
+            except Exception as e:
+                print(f"[ERROR] Screenshot exception for {sender}: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 thumb_path = None
 
         ext = file.split('.')[-1].lower()
