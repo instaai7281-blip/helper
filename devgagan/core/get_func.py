@@ -598,12 +598,16 @@ async def get_final_caption(msg, sender):
     custom_caption = get_user_caption_preference(sender)
     final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
 
-    # ✅ Remove unwanted branding
+    # ✅ Remove unwanted branding and random garbage texts
     final_caption = re.sub(r'(?i)team[\s_\-\.]*jnc', '', final_caption)
+    final_caption = re.sub(r'(?i)let\'?s\s*help', '', final_caption)
     final_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', final_caption)
 
-    # Replace @mentions with bold Stolen Happiness
-    final_caption = re.sub(r'@\w+', '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**', final_caption)
+    # ✅ Aggressive text cleanup: remove anything after an @mention or links entirely if they denote other sources
+    # For captions, user asked to only retain their tag, removing any other mentions.
+    # We replace any @mention with the custom renaming tag or a default if not set.
+    user_tag = custom_caption if custom_caption else '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**'
+    final_caption = re.sub(r'@\w+', user_tag, final_caption)
 
     # Replace all links with your channel link
     final_caption = re.sub(r'https?://\S+|www\.\S+', '🖤', final_caption)
@@ -847,15 +851,17 @@ def format_caption(original_caption, sender, custom_caption):
     # ✅ Clean fancy characters and replace emojis
     #original_caption = replace_fancy_and_emoji(original_caption)
 
-    # ✅ Remove unwanted branding
+    # ✅ Remove unwanted branding and aggressive garbage cleanup
     original_caption = re.sub(r'(?i)team[\s_\-\.]*jnc', '', original_caption)
+    original_caption = re.sub(r'(?i)let\'?s\s*help', '', original_caption)
     original_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', original_caption)
 
     # ✅ Remove all hashtags like #Movie
     original_caption = re.sub(r'#\S+', '', original_caption)
 
-    # ✅ Replace @mentions
-    original_caption = re.sub(r'@\w+', '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**', original_caption)
+    # ✅ Replace @mentions aggressively
+    user_tag = custom_caption if custom_caption else '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**'
+    original_caption = re.sub(r'@\w+', user_tag, original_caption)
 
     # ✅ Replace telegram links
     original_caption = re.sub(
@@ -1380,8 +1386,10 @@ async def rename_file(file, sender, caption=None):
     base_name = os.path.basename(base_name)
 
     # Apply text transformations
-    base_name = re.sub(r'@\w+', '@Chosen_Onex', base_name)  # Replace mentions
+    # Fully swap out any mentions for their own tag or a safe default
+    base_name = re.sub(r'@\w+', getattr(custom_rename_tag, '', '@Chosen_Onex'), base_name)
     base_name = re.sub(r'(?i)team[\s_\-\.]*jnc', '', base_name)  # Remove team jnc
+    base_name = re.sub(r'(?i)let\'?s\s*help', '', base_name)  # Remove let's help
     base_name = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', base_name)  # Remove study vault
     for word in delete_words:
         base_name = base_name.replace(word, "")  # Remove banned words
