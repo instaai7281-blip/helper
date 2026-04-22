@@ -599,8 +599,9 @@ async def get_final_caption(msg, sender):
     final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
 
     # ✅ Remove unwanted branding and random garbage texts
-    final_caption = re.sub(r'(?i)team[\s_\-\.]*jnc', '', final_caption)
-    final_caption = re.sub(r'(?i)let\'?s\s*help', '', final_caption)
+    final_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', final_caption)
+    final_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', final_caption)
+    final_caption = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', final_caption)
     final_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', final_caption)
 
     # ✅ Aggressive text cleanup: remove anything after an @mention or links entirely if they denote other sources
@@ -852,8 +853,9 @@ def format_caption(original_caption, sender, custom_caption):
     #original_caption = replace_fancy_and_emoji(original_caption)
 
     # ✅ Remove unwanted branding and aggressive garbage cleanup
-    original_caption = re.sub(r'(?i)team[\s_\-\.]*jnc', '', original_caption)
-    original_caption = re.sub(r'(?i)let\'?s\s*help', '', original_caption)
+    original_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', original_caption)
+    original_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', original_caption)
+    original_caption = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', original_caption)
     original_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', original_caption)
 
     # ✅ Remove all hashtags like #Movie
@@ -1388,8 +1390,9 @@ async def rename_file(file, sender, caption=None):
     # Apply text transformations
     # Fully swap out any mentions for their own tag or a safe default
     base_name = re.sub(r'@\w+', getattr(custom_rename_tag, '', '@Chosen_Onex'), base_name)
-    base_name = re.sub(r'(?i)team[\s_\-\.]*jnc', '', base_name)  # Remove team jnc
-    base_name = re.sub(r'(?i)let\'?s\s*help', '', base_name)  # Remove let's help
+    base_name = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', base_name)  # Remove team jnc
+    base_name = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', base_name) # Remove team spay
+    base_name = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', base_name)  # Remove let's help
     base_name = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', base_name)  # Remove study vault
     for word in delete_words:
         base_name = base_name.replace(word, "")  # Remove banned words
