@@ -95,21 +95,21 @@ async def progress_bar(current, total, ud_type, message, start):
     now = time.time()
     diff = now - start
     
-    # Use a faster update interval (3 seconds) for a "live" feel
+    # Update every 5 seconds or on completion to minimize API overhead
     if not hasattr(progress_bar, "last_update"):
         progress_bar.last_update = 0
             
-    if (now - progress_bar.last_update) >= 3 or current == total:
+    if (now - progress_bar.last_update) >= 5 or current == total:
         progress_bar.last_update = now
-
         percentage = current * 100 / total
-        speed = current / diff
-        elapsed_time = round(diff) * 1000
-        time_to_completion = round((total - current) / speed) * 1000
-        estimated_total_time = elapsed_time + time_to_completion
-
-        elapsed_time = TimeFormatter(milliseconds=elapsed_time)
-        estimated_total_time = TimeFormatter(milliseconds=estimated_total_time)
+        speed = current / diff if diff > 0 else 0
+        
+        # Avoid division by zero and handle tiny speeds
+        if speed > 0:
+            time_to_completion = round((total - current) / speed)
+            estimated_total_time = TimeFormatter(milliseconds=time_to_completion * 1000)
+        else:
+            estimated_total_time = "Calculating..."
 
         progress = "{0}{1}".format(
             ''.join(["❤️" for i in range(math.floor(percentage / 10))]),
@@ -120,12 +120,10 @@ async def progress_bar(current, total, ud_type, message, start):
             humanbytes(current),
             humanbytes(total),
             humanbytes(speed),
-
-            estimated_total_time if estimated_total_time != '' else "0 s"
+            estimated_total_time
         )
         try:
-            await message.edit(
-                text="{}    {}".format(ud_type, tmp),)             
+            await message.edit(text=f"{ud_type} {tmp}")
         except:
             pass
 

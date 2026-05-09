@@ -42,16 +42,73 @@ from datetime import datetime
 from pyrogram.enums import ParseMode
 from telethon.tl.types import DocumentAttributeVideo
 import random
+import io
+try:
+    from PyPDF2 import PdfReader, PdfWriter
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+except ImportError:
+    PdfReader = PdfWriter = canvas = None
 
 # Define custom emojis for random selection
 CUSTOM_EMOJIS = ["🍁", "🍀", "👑", "✨", "🦋", "🌟", "💖"]
 
 # Clean filename helper
+def clean_text_advanced(text, user_tag, delete_words=None, replacements=None):
+    if not text:
+        return text
+    
+    # List of unwanted phrases (case-insensitive)
+    unwanted_phrases = [
+        r'team[\s_\-\.]*jnc',
+        r'team[\s_\-\.]*spy',
+        r'team[\s_\-\.]*spay',
+        r'team[\s_\-\.]*spy[\s_\-\.]*pro',
+        r'let\'?s\s*help',
+        r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?',
+        r'devgagan',
+        r'@Src_pro_bot',
+        r'Chosen\s*One',
+        r'jnc',
+        r'spy',
+        r'spay',
+        r'lets\s*help'
+    ]
+    
+    for phrase in unwanted_phrases:
+        text = re.sub(f'(?i)[*_]*{phrase}[*_]*', '', text)
+    
+    # Replace any @mention with the specific user tag
+    text = re.sub(r'@\w+', user_tag, text)
+
+    # Replace brackets with stylized ones
+    text = re.sub(r'[({[]', '〘', text)
+    text = re.sub(r'[)}\]]', '〙', text)
+
+    # Rebrand common extraction markers
+    text = re.sub(r'(?i)(Extracted|Downloaded|Uploaded)[\s_]*By\s*[:➤>–\-]*\s*[^\n]*', r'<b>Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss</b>', text)
+
+    # Apply custom delete words
+    if delete_words:
+        for word in delete_words:
+            text = text.replace(word, ' ')
+
+    # Apply custom replacements
+    if replacements:
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+    
+    # Remove extra horizontal spaces but PRESERVE newlines
+    text = re.sub(r'[ \t]+', ' ', text).strip()
+    return text
 
 
-def clean_filename(text):
+def clean_filename(text, user_tag):
     if not text:
         return "file"
+    
+    # Remove unwanted branding first
+    text = clean_text_advanced(text, user_tag, None, None)
 
     # Normalize to separate combined accents
     text = unicodedata.normalize("NFKC", text)
@@ -62,11 +119,16 @@ def clean_filename(text):
         if not unicodedata.category(char).startswith('S')  # Symbols (includes emojis)
         and not unicodedata.category(char).startswith('C')  # Other (control chars, etc.)
         and not unicodedata.category(char).startswith('P')  # Punctuation
-        or char in ['.', '-', '_']  # keep basic filename-safe symbols
+        or char in ['.', '-', '_', '〘', '〙', '⛥']  # keep basic filename-safe symbols and user custom ones
     )
 
     # Normalize spaces, dashes, underscores
     text = re.sub(r'[_\s\-]+', ' ', text)
+
+    # Add star to PDF files if requested
+    if text.lower().endswith(".pdf"):
+        # Replace .pdf at the end with ' ⛥.pdf'
+        text = re.sub(r'(?i)\.pdf$', ' ⛥.pdf', text)
 
     # Final strip
     return text.strip()
@@ -104,11 +166,84 @@ async def fetch_upload_method(user_id):
     return user_data.get("upload_method", "Pyrogram") if user_data else "Pyrogram"
 
 
+async def add_pdf_watermark(input_path, watermark_text, grid=False, opacity=0.12):
+    if not PdfReader:
+        return input_path
+    
+    output_path = input_path.replace(".pdf", "_watermarked.pdf")
+    try:
+        reader = PdfReader(input_path)
+        writer = PdfWriter()
+
+        for page in reader.pages:
+            width = float(page.mediabox.width)
+            height = float(page.mediabox.height)
+
+            packet = io.BytesIO()
+            can = canvas.Canvas(packet, pagesize=(width, height))
+            
+            if grid:
+                # --- Grid Watermark (Full Page) ---
+                can.setFont("Helvetica-Bold", 18)
+                can.setStrokeColorRGB(0.7, 0.7, 0.7)
+                can.setFillAlpha(opacity / 1.5)
+                for x in range(0, int(width), 150):
+                    for y in range(0, int(height), 150):
+                        can.saveState()
+                        can.translate(x, y)
+                        can.rotate(30)
+                        can.drawCentredString(0, 0, watermark_text)
+                        can.restoreState()
+            else:
+                # --- 1. Large Central Diagonal Watermark ---
+                font_size = width / 10
+                can.setFont("Helvetica-Bold", font_size)
+                can.setStrokeColorRGB(0.6, 0.7, 0.8) # Subtle blue-grey
+                can.setFillAlpha(opacity)
+                
+                can.saveState()
+                can.translate(width / 2, height / 2)
+                can.rotate(45)
+                can.drawCentredString(0, 0, watermark_text)
+                can.restoreState()
+
+            # --- 2. Professional Footer Stamp ---
+            can.setFont("Helvetica-BoldOblique", 10)
+            can.setFillAlpha(0.5)
+            can.setStrokeColorRGB(0.3, 0.3, 0.3)
+            # Bottom Left
+            can.drawString(20, 15, f"Original Content: {watermark_text}")
+            # Bottom Right (Page info placeholder or branding)
+            can.drawRightString(width - 20, 15, "Verified Secure PDF 🔒")
+            
+            # --- 3. Top Banner ---
+            can.setFont("Helvetica", 8)
+            can.setFillAlpha(0.3)
+            can.drawCentredString(width / 2, height - 20, f"--- Exclusive Access for {watermark_text} members ---")
+
+            can.save()
+            packet.seek(0)
+            
+            watermark_pdf = PdfReader(packet)
+            watermark_page = watermark_pdf.pages[0]
+            
+            page.merge_page(watermark_page)
+            writer.add_page(page)
+
+        with open(output_path, "wb") as f:
+            writer.write(f)
+        
+        return output_path
+    except Exception as e:
+        print(f"Error adding powerful watermark: {e}")
+        return input_path
+
+
 def format_caption_to_html(caption: str) -> str:
     if not caption:
-        return None
+        return ""
 
-    caption = re.sub(r"^> (.*)", r"<blockquote>\1</blockquote>", caption, flags=re.MULTILINE)
+    # Support standard Markdown to HTML conversion
     caption = re.sub(r"```(.*?)```", r"<pre>\1</pre>", caption, flags=re.DOTALL)
     caption = re.sub(r"`(.*?)`", r"<code>\1</code>", caption)
     caption = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", caption)
@@ -119,6 +254,26 @@ def format_caption_to_html(caption: str) -> str:
     caption = re.sub(r"\|\|(.*?)\|\|", r"<details>\1</details>", caption)
     caption = re.sub(r"\[(.*?)\]\((.*?)\)", r'<a href="\2">\1</a>', caption)
     
+    # Improved Blockquote support (trigger on any line starting with >)
+    lines = caption.split("\n")
+    new_lines = []
+    in_quote = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith(">"):
+            if not in_quote:
+                new_lines.append("<blockquote>")
+                in_quote = True
+            new_lines.append(stripped[1:].strip())
+        else:
+            if in_quote:
+                new_lines.append("</blockquote>")
+                in_quote = False
+            new_lines.append(line)
+    if in_quote:
+        new_lines.append("</blockquote>")
+    caption = "\n".join(new_lines)
+
     return caption.strip()
 
     
@@ -190,14 +345,18 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
 
         ext = file.split('.')[-1].lower()
         raw_name = os.path.basename(file)
-        clean_name = clean_filename(os.path.splitext(raw_name)[0])
+        
+        # Get active tag for filename cleaning
+        user_data = await odb.get_data(sender)
+        active_tag = user_data.get("active_tag", "@Chosen_Onex_bot") if user_data else "@Chosen_Onex_bot"
+        
+        clean_name = clean_filename(os.path.splitext(raw_name)[0], active_tag)
         file_name = f"{clean_name}.{ext}"
 
         video_formats = set(VIDEO_EXTENSIONS)
         image_formats = {'jpg', 'png', 'jpeg'}
 
-        # ✅ Generate cleaned caption for user post
-        caption = format_caption(caption, sender, custom_caption=None)
+        # ✅ Caption is already formatted for user post by get_final_caption
 
         # ✅ Generate log caption separately
         user = await app.get_users(sender)
@@ -228,7 +387,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     duration=duration,
                     thumb=thumb_path,
                     reply_to_message_id=topic_id,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=ParseMode.HTML,
                     progress=progress_bar,
                     progress_args=("╔══━⚡️Uploading...⚡️━══╗\n", edit, time.time())
                 )
@@ -250,7 +409,7 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
                     caption=caption,
                     thumb=thumb_path,
                     reply_to_message_id=topic_id,
-                    parse_mode=ParseMode.MARKDOWN,
+                    parse_mode=ParseMode.HTML,
                     progress=progress_bar,
                     progress_args=("╔══━⚡️Uploading...⚡️━══╗\n", edit, time.time())
                 )
@@ -271,7 +430,8 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         elif upload_method == "Telethon":
             await edit.delete()
             progress_message = await gf.send_message(sender, "**__Uploading...__**")
-            caption_html = await format_caption_to_html(caption)
+            # Caption is already HTML
+            caption_html = caption
 
             uploaded = await fast_upload(
                 gf, file,
@@ -334,6 +494,7 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         msg_link = msg_link.split("?single")[0]
         chat, msg_id = None, None
         saved_channel_ids = load_saved_channel_ids()
+        upload_method = await fetch_upload_method(sender)
         size_limit = 2 * 1024 * 1024 * 1024  # 1.99 GB size limit
         file = ''
         edit = ''
@@ -446,7 +607,7 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
             target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
 
         # Handle different message types
-        if msg.media == MessageMediaType.WEB_PAGE_PREVIEW:
+        if msg.media == MessageMediaType.WEB_PAGE:
             if not await is_enabled(sender, "text"):
                 return
             await clone_message(app, msg, target_chat_id, topic_id, edit_id, LOG_GROUP)
@@ -473,19 +634,44 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         file_name = await get_media_filename(msg)
         edit = await app.edit_message_text(sender, edit_id, "**>Downloading...Darling 😘**")
 
-        # Download media
-        file = await userbot.download_media(
-            msg,
-            file_name=file_name,            
-            progress_args=("╔══━⚡️ Downloading ⚡️━══╗\n", edit, time.time()),
-            progress=progress_bar
-        )
+        # Optimized Download media
+        if upload_method == "Telethon":
+            file = await fast_download(
+                userbot, msg, edit, file_name,
+                lambda done, total: progress_callback(done, total, sender)
+            )
+        else:
+            file = await userbot.download_media(
+                msg,
+                file_name=file_name,            
+                progress_args=("╔══━⚡️ Downloading ⚡️━══╗\n", edit, time.time()),
+                progress=progress_bar
+            )
         
         if not file:
             await edit.edit("❌ **Download failed** - The file might be corrupted or the bot's session has expired.")
             return
 
         caption = await get_final_caption(msg, sender)
+
+        # Apply PDF Watermark if enabled
+        if file.lower().endswith(".pdf"):
+            data = await odb.get_data(sender)
+            if data and data.get("pdf_watermark"):
+                # Use custom watermark text if available, otherwise use rebrand tag, otherwise default
+                watermark_to_use = data.get("watermark_text")
+                if not watermark_to_use:
+                    watermark_to_use = user_rename_preferences.get(str(sender), '@Chosen_Onex_bot')
+                
+                grid_val = data.get("pdf_grid", False)
+                opacity_val = data.get("pdf_opacity", 0.12)
+                
+                await edit.edit(f"🛡️ **Adding {'Grid' if grid_val else 'Diagonal'} Watermark...**")
+                watermarked_file = await add_pdf_watermark(file, watermark_to_use, grid=grid_val, opacity=opacity_val)
+                if watermarked_file != file:
+                    if os.path.exists(file):
+                        os.remove(file)
+                    file = watermarked_file
 
         # Rename file
         file = await rename_file(file, sender)
@@ -568,14 +754,14 @@ async def handle_sticker(app, msg, target_chat_id, topic_id, edit_id, log_group)
 
 async def get_media_filename(msg):
     if msg.document:
-        return msg.document.file_name or "Document_By_@Src_pro_bot.txt"
+        return msg.document.file_name or "Document.txt"
     if msg.video:
-        return msg.video.file_name or "Video_By_@Src_pro_bot.mp4"
+        return msg.video.file_name or "Video.mp4"
     if msg.audio:
-        return msg.audio.file_name or "Audio_By_@Src_pro_bot.mp3"
+        return msg.audio.file_name or "Audio.mp3"
     if msg.photo:
-        return "Image_By_@Src_pro_bot.jpg"
-    return "File_By_@Src_pro_bot.dat"
+        return "Image.jpg"
+    return "File.dat"
 
 
 
@@ -591,34 +777,35 @@ def get_message_file_size(msg):
 
 
 async def get_final_caption(msg, sender):
-    # Get original caption in markdown if available
-    original_caption = msg.caption.markdown if msg.caption else ""
+    # Get user data from DB
+    user_data = await odb.get_data(sender)
     
-    # Add custom caption if present
-    custom_caption = get_user_caption_preference(sender)
-    final_caption = f"{original_caption}\n\n{custom_caption}" if custom_caption else original_caption
+    # Get custom caption from DB
+    custom_caption = user_data.get("caption") if user_data else ""
+    
+    # Get active tag for cleaning and display
+    active_tag = user_data.get("active_tag", "@Chosen_Onex_bot") if user_data else "@Chosen_Onex_bot"
+    
+    # Get original caption in HTML format to preserve blockquotes and other formatting
+    original_caption = msg.caption.html if msg.caption else ""
+    
+    # Clean original caption with the user's active tag and custom word filters
+    delete_words = user_data.get("delete_words", []) if user_data else []
+    replacements = user_data.get("replacement_words", {}) if user_data else {}
+    cleaned_original = clean_text_advanced(original_caption, active_tag, delete_words, replacements)
+    
+    if custom_caption:
+        # Use user's custom caption template
+        if "{caption}" in custom_caption:
+            final_text = custom_caption.replace("{caption}", cleaned_original)
+        else:
+            final_text = f"{cleaned_original}\n\n{custom_caption}"
+    else:
+        # Just use the cleaned original text as is
+        final_text = cleaned_original
 
-    # ✅ Remove unwanted branding and random garbage texts
-    final_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', final_caption)
-    final_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', final_caption)
-    final_caption = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', final_caption)
-    final_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', final_caption)
-
-    # ✅ Aggressive text cleanup: remove anything after an @mention or links entirely if they denote other sources
-    # For captions, user asked to only retain their tag, removing any other mentions.
-    # We replace any @mention with the custom renaming tag or a default if not set.
-    user_tag = custom_caption if custom_caption else '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**'
-    final_caption = re.sub(r'@\w+', user_tag, final_caption)
-
-    # Replace all links with your channel link
-    final_caption = re.sub(r'https?://\S+|www\.\S+', '🖤', final_caption)
-
-    # Perform additional replacements from user-defined rules
-    replacements = load_replacement_words(sender)
-    for word, replace_word in replacements.items():
-        final_caption = final_caption.replace(word, replace_word)
-
-    return final_caption.strip() if final_caption else None
+    # Final HTML formatting support
+    return format_caption_to_html(final_text)
 
 
 
@@ -674,21 +861,27 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
         if not msg or msg.empty:
             return False
 
-        # If protected content, force extraction (return False here)
-        if msg.has_protected_content:
+        # If PDF Watermarking is ON, we MUST extract (don't use copy)
+        data_stored = await odb.get_data(sender)
+        is_pdf = msg.document and msg.document.file_name and msg.document.file_name.lower().endswith(".pdf")
+        if data_stored and data_stored.get("pdf_watermark") and is_pdf:
             return False
 
-        custom_caption = get_user_caption_preference(sender)
-        final_caption = format_caption(msg.caption or '', sender, custom_caption)
+        final_caption = await get_final_caption(msg, sender)
 
         topic_id = None
         if '/' in str(target_chat_id):
             target_chat_id, topic_id = map(int, target_chat_id.split('/', 1))
 
-        if msg.media:
-            result = await send_media_message(app, target_chat_id, msg, final_caption, topic_id)
-        elif msg.text:
-            result = await app.copy_message(target_chat_id, chat_id, message_id, reply_to_message_id=topic_id)
+        # Use copy_message for EVERYTHING (media + text) - it's fast and handles server-side copy
+        result = await app.copy_message(
+            chat_id=target_chat_id,
+            from_chat_id=chat_id,
+            message_id=message_id,
+            caption=final_caption,
+            reply_to_message_id=topic_id,
+            parse_mode=ParseMode.HTML
+        )
         
         if result:
             return True
@@ -772,10 +965,10 @@ async def send_media_message(app, target_chat_id, msg, caption, topic_id):
 
         # Caption handling
         if caption:
-            # If caption exists → keep it same, just replace links if needed
+            # If caption exists → keep it same, just remove links if needed
             caption = re.sub(
                 r'https?://t\.me/[^\s]+|https?://telegram\.me/[^\s]+',
-                'https://t.me/+7R-7p7jVoz9mM2M1',
+                '',
                 caption
             )
         elif file_name:
@@ -843,32 +1036,26 @@ def replace_fancy_and_emoji(text: str) -> str:
     return ''.join(result)
 
 def format_caption(original_caption, sender, custom_caption):
-    delete_words = load_delete_words(sender)
-    replacements = load_replacement_words(sender)
-
+    # Fetch active tag for this user
+    user_data = collection.find_one({"_id": sender})
+    user_tag = user_data.get("active_tag", "@Chosen_Onex_bot") if user_data else "@Chosen_Onex_bot"
+    delete_words = user_data.get("delete_words", []) if user_data else []
+    replacements = user_data.get("replacement_words", {}) if user_data else {}
+    
     if not original_caption:
         original_caption = ""
 
-    # ✅ Clean fancy characters and replace emojis
-    #original_caption = replace_fancy_and_emoji(original_caption)
-
-    # ✅ Remove unwanted branding and aggressive garbage cleanup
-    original_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', original_caption)
-    original_caption = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', original_caption)
-    original_caption = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', original_caption)
-    original_caption = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', original_caption)
+    # Clean unwanted phrases
+    original_caption = clean_text_advanced(original_caption, user_tag, delete_words, replacements)
 
     # ✅ Remove all hashtags like #Movie
     original_caption = re.sub(r'#\S+', '', original_caption)
 
-    # ✅ Replace @mentions aggressively
-    user_tag = custom_caption if custom_caption else '**❉ Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**'
-    original_caption = re.sub(r'@\w+', user_tag, original_caption)
-
-    # ✅ Replace telegram links
+    # ✅ Replace telegram links with a clean placeholder or keep them
+    # Removed hardcoded spam link
     original_caption = re.sub(
         r'https?://(t\.me|telegram\.me)/[^\s]+',
-        'https://t.me/+7R-7p7jVoz9mM2M1',
+        '',
         original_caption
     )
 
@@ -900,15 +1087,7 @@ def format_caption(original_caption, sender, custom_caption):
         flags=re.IGNORECASE
         )
 
-    # 🔁 Delete unwanted words
-    for word in delete_words:
-        original_caption = original_caption.replace(word, ' ')
-
-    # 🔁 Replace mapped words
-    for old, new in replacements.items():
-        original_caption = original_caption.replace(old, new)
-
-    # ✅ Symbol replacements
+    # Symbols and other cleaning
     original_caption = original_caption.replace("[", "〘").replace("]", "〙")
     original_caption = original_caption.replace("📕", "📓")
     original_caption = original_caption.replace("📽️", "🍀")
@@ -979,7 +1158,7 @@ async def set_rename_command(user_id, custom_rename_tag):
 get_user_rename_preference = lambda user_id: user_rename_preferences.get(str(user_id), '⛥ @II_LevelUp_II')
 
 async def set_caption_command(user_id, custom_caption):
-    user_caption_preferences[str(user_id)] = custom_caption
+    await odb.update_data(user_id, {"caption": custom_caption})
 
 get_user_caption_preference = lambda user_id: user_caption_preferences.get(str(user_id), '')
 
@@ -996,10 +1175,15 @@ async def settings_command(event):
     await send_settings_message(event.chat_id, user_id)
 
 async def send_settings_message(chat_id, user_id):
+    # Fetch current user data for filters status
+    data = await odb.get_data(user_id)
+    filters = data.get("filters", {}) if data else {}
+    
     buttons = [
-        [Button.inline("💀 Forward to Chat", b'setchat'), Button.inline("✏️ Set Rename Tag", b'setrename')],
-        [Button.inline("🔆 Set Caption", b'setcaption'), Button.inline("💠 Replace Words", b'setreplacement')],
-        [Button.inline("‼️ Remove Words 🗑️", b'delete')],
+        [Button.inline("💀 Forward to Chat", b'setchat'), Button.inline("🏷️ Manage Tags", b'tag_manager')],
+        [Button.inline("✏️ Set Rename Tag", b'setrename'), Button.inline("🔆 Set Caption", b'setcaption')],
+        [Button.inline("💠 Replace Words", b'setreplacement'), Button.inline("🗑️ Remove Words", b'delete')],
+        [Button.inline("🎭 Media Filters", b'filters'), Button.inline("📄 PDF Settings", b'pdf_settings')],
         [Button.inline("🖼️ Set Thumbnail", b'setthumb'), Button.inline("🧲 Remove Thumbnail", b'remthumb')],
         [Button.inline("📤 Upload Method", b'uploadmethod'), Button.inline("⛔ Logout", b'logout')],
         [Button.inline("♻️ Reset All Settings ☢️", b'reset')],
@@ -1013,13 +1197,81 @@ async def send_settings_message(chat_id, user_id):
         buttons=buttons
     )
 
+async def send_filter_menu(event, user_id):
+    data = await odb.get_data(user_id)
+    filters = data.get("filters", {}) if data else {}
+    
+    def get_status(m_type):
+        return "🟢 ON" if filters.get(m_type, True) else "🔴 OFF"
+
+    buttons = [
+        [Button.inline(f"Video: {get_status('video')}", b'toggle_video'), Button.inline(f"Audio: {get_status('audio')}", b'toggle_audio')],
+        [Button.inline(f"Document: {get_status('document')}", b'toggle_document'), Button.inline(f"Photo: {get_status('photo')}", b'toggle_photo')],
+        [Button.inline("⬅️ Back", b'back_to_settings')]
+    ]
+    
+    await event.edit("🎭 **Media Filters**\n\nChoose which media types you want the bot to process:", buttons=buttons)
+
+async def send_pdf_settings(event, user_id):
+    data = await odb.get_data(user_id)
+    pdf_watermark = data.get("pdf_watermark", False) if data else False
+    grid_mode = data.get("pdf_grid", False) if data else False
+    opacity = data.get("pdf_opacity", 0.12) if data else 0.12
+    
+    status = "🟢 Enabled" if pdf_watermark else "🔴 Disabled"
+    mode_text = "🔳 Grid Mode" if grid_mode else "🎯 Single Mode"
+    opacity_text = f"💡 Opacity: {int(opacity * 100)}%"
+    custom_text = data.get("watermark_text", "Default Tag") if data else "Default Tag"
+    
+    buttons = [
+        [Button.inline(f"Status: {status}", b'toggle_pdf_watermark')],
+        [Button.inline(f"Style: {mode_text}", b'toggle_pdf_grid')],
+        [Button.inline(f"Opacity: {opacity_text}", b'cycle_pdf_opacity')],
+        [Button.inline(f"🖋️ Set Text: {custom_text}", b'set_pdf_text')],
+        [Button.inline("⬅️ Back to Menu", b'back_to_settings')]
+    ]
+    
+    msg = (
+        "📄 **Premium PDF Branding**\n\n"
+        f"🛡️ **Current Text**: `{custom_text}`\n"
+        f"🎨 **Style**: `{'Repeating Grid' if grid_mode else 'Central Diagonal'}`\n"
+        f"✨ **Visibility**: `{int(opacity*100)}% Transparent`\n\n"
+        "Configure your professional PDF watermark settings below:"
+    )
+    await event.edit(msg, buttons=buttons)
+
 
 pending_photos = {}
+
+async def send_tag_manager(event, user_id):
+    data = await odb.get_data(user_id)
+    tag_list = data.get("tag_list", []) if data else []
+    active_tag = data.get("active_tag", "@Chosen_Onex_bot") if data else "@Chosen_Onex_bot"
+    
+    msg = f"🏷️ **Tag Manager**\n\n**Active Tag**: `{active_tag}`\n\nYour saved tags:\n"
+    buttons = []
+    
+    if not tag_list:
+        msg += "_No tags saved yet._"
+    else:
+        for i, tag in enumerate(tag_list):
+            msg += f"{i+1}. `{tag}`\n"
+            # Limit to 10 tags for UI sanity
+            if i < 10:
+                buttons.append([
+                    Button.inline(f"✅ Use {tag[:15]}...", f"select_tag_{i}".encode()),
+                    Button.inline(f"🗑️", f"del_tag_{i}".encode())
+                ])
+    
+    buttons.append([Button.inline("➕ Add New Tag", b'add_tag')])
+    buttons.append([Button.inline("⬅️ Back", b'back_to_settings')])
+    
+    await event.edit(msg, buttons=buttons)
 
 @gf.on(events.CallbackQuery)
 async def callback_query_handler(event):
     user_id = event.sender_id
-    data = event.data.decode()  # Decode bytes to string
+    data = event.data.decode() if isinstance(event.data, bytes) else event.data
 
     if data == 'setchat':
         await event.respond(
@@ -1033,6 +1285,33 @@ async def callback_query_handler(event):
     elif data == 'setrename':
         await event.respond("✏️ Send the **rename tag** you want to set your custom name")
         sessions[user_id] = 'setrename'
+
+    elif data == 'tag_manager':
+        await send_tag_manager(event, user_id)
+
+    elif data == 'add_tag':
+        await event.respond("🖋️ Send the **Tag** (e.g. `@MyBot`) you want to add to your list:")
+        sessions[user_id] = 'addnewtag'
+
+    elif data.startswith('select_tag_'):
+        index = int(data.split('_')[-1])
+        data_stored = await odb.get_data(user_id)
+        tag_list = data_stored.get("tag_list", [])
+        if index < len(tag_list):
+            new_active = tag_list[index]
+            await odb.update_data(user_id, {"active_tag": new_active})
+            await event.answer(f"✅ Tag set to: {new_active}")
+            await send_tag_manager(event, user_id)
+
+    elif data.startswith('del_tag_'):
+        index = int(data.split('_')[-1])
+        data_stored = await odb.get_data(user_id)
+        tag_list = data_stored.get("tag_list", [])
+        if index < len(tag_list):
+            removed = tag_list.pop(index)
+            await odb.update_data(user_id, {"tag_list": tag_list})
+            await event.answer(f"🗑️ Removed: {removed}")
+            await send_tag_manager(event, user_id)
 
     elif data == 'setcaption':
         await event.respond("📝 Send the **caption format** (you can include variables like {filename}, {size}):")
@@ -1117,6 +1396,63 @@ async def callback_query_handler(event):
         except Exception as e:
             await event.respond(f"Error clearing delete list: {e}")
     
+    elif data == 'filters':
+        await send_filter_menu(event, user_id)
+
+    elif data.startswith('toggle_'):
+        media_type = data.split('_')[1]
+        data_stored = await odb.get_data(user_id)
+        filters = data_stored.get("filters", {}) if data_stored else {}
+        filters[media_type] = not filters.get(media_type, True)
+        await odb.update_data(user_id, {"filters": filters})
+        await send_filter_menu(event, user_id)
+
+    elif data == 'pdf_settings':
+        await send_pdf_settings(event, user_id)
+
+    elif data == 'set_pdf_text':
+        await event.respond("🖋️ Send the **Text** you want to use as a PDF watermark:")
+        sessions[user_id] = 'setpdfwatermark'
+
+    elif data == 'toggle_pdf_watermark':
+        data_stored = await odb.get_data(user_id)
+        current = data_stored.get("pdf_watermark", False) if data_stored else False
+        await odb.update_data(user_id, {"pdf_watermark": not current})
+        await send_pdf_settings(event, user_id)
+
+    elif data == 'toggle_pdf_grid':
+        data_stored = await odb.get_data(user_id)
+        current = data_stored.get("pdf_grid", False) if data_stored else False
+        await odb.update_data(user_id, {"pdf_grid": not current})
+        await send_pdf_settings(event, user_id)
+
+    elif data == 'cycle_pdf_opacity':
+        data_stored = await odb.get_data(user_id)
+        current = data_stored.get("pdf_opacity", 0.12) if data_stored else 0.12
+        # Cycle through 0.12 -> 0.3 -> 0.6 -> 0.12
+        if current < 0.2:
+            new_val = 0.3
+        elif current < 0.4:
+            new_val = 0.6
+        else:
+            new_val = 0.12
+        await odb.update_data(user_id, {"pdf_opacity": new_val})
+        await send_pdf_settings(event, user_id)
+
+    elif data == 'back_to_settings':
+        # Re-send main settings menu
+        buttons = [
+            [Button.inline("💀 Forward to Chat", b'setchat'), Button.inline("🏷️ Manage Tags", b'tag_manager')],
+            [Button.inline("✏️ Set Rename Tag", b'setrename'), Button.inline("🔆 Set Caption", b'setcaption')],
+            [Button.inline("💠 Replace Words", b'setreplacement'), Button.inline("🗑️ Remove Words", b'delete')],
+            [Button.inline("🎭 Media Filters", b'filters'), Button.inline("📄 PDF Settings", b'pdf_settings')],
+            [Button.inline("🖼️ Set Thumbnail", b'setthumb'), Button.inline("🧲 Remove Thumbnail", b'remthumb')],
+            [Button.inline("📤 Upload Method", b'uploadmethod'), Button.inline("⛔ Logout", b'logout')],
+            [Button.inline("♻️ Reset All Settings ☢️", b'reset')],
+            [Button.url("💞 Contact Owner 🦋", "https://t.me/Chosen_Onex_bo")]
+        ]
+        await event.edit(MESS, buttons=buttons)
+
     elif event.data == b'remthumb':
         try:
             thumbnail_path = os.path.join(THUMBNAIL_DIR, f"{user_id}.jpg")
@@ -1166,6 +1502,22 @@ async def handle_user_input(event):
             custom_rename_tag = event.text
             await set_rename_command(user_id, custom_rename_tag)
             await event.respond(f"😉 Your Custom rename tag set to: {custom_rename_tag} 🌝")
+
+        elif session_type == 'addnewtag':
+            new_tag = event.text
+            data_stored = await odb.get_data(user_id)
+            tag_list = data_stored.get("tag_list", []) if data_stored else []
+            if new_tag not in tag_list:
+                tag_list.append(new_tag)
+                await odb.update_data(user_id, {"tag_list": tag_list, "active_tag": new_tag})
+                await event.respond(f"✅ Tag `{new_tag}` added and set as active!")
+            else:
+                await event.respond("⚠️ This tag is already in your list.")
+        
+        elif session_type == 'setpdfwatermark':
+            pdf_text = event.text
+            await odb.update_data(user_id, {"watermark_text": pdf_text})
+            await event.respond(f"📄 PDF Watermark text set to: `{pdf_text}` ✅")
         
         elif session_type == 'setcaption':
             custom_caption = event.text
@@ -1387,13 +1739,8 @@ async def rename_file(file, sender, caption=None):
     # Clean the base name
     base_name = os.path.basename(base_name)
 
-    # Apply text transformations
-    # Fully swap out any mentions for their own tag or a safe default
-    base_name = re.sub(r'@\w+', getattr(custom_rename_tag, '', '@Chosen_Onex'), base_name)
-    base_name = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', base_name)  # Remove team jnc
-    base_name = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', base_name) # Remove team spay
-    base_name = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', base_name)  # Remove let's help
-    base_name = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', base_name)  # Remove study vault
+    # Apply advanced cleaning
+    base_name = clean_text_advanced(base_name, sender)
     for word in delete_words:
         base_name = base_name.replace(word, "")  # Remove banned words
     for word, replace_word in replacements.items():

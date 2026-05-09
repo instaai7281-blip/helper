@@ -95,4 +95,12 @@ async def set_filter(user_id, media_type, status):
 async def delete_session(user_id):
     """Delete the session associated with the given user_id from the database."""
     await db.update_one({"_id": user_id}, {"$unset": {"session": ""}})
+
+async def update_data(user_id, update_dict):
+    data = await get_data(user_id)
+    if data and data.get("_id"):
+        await db.update_one({"_id": user_id}, {"$set": update_dict})
+    else:
+        update_dict["_id"] = user_id
+        await db.insert_one(update_dict)
  

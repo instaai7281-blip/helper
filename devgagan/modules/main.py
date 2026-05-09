@@ -42,7 +42,6 @@ batch_mode = {}
 async def process_and_upload_link(userbot, user_id, msg_id, link, retry_count, message):
     try:
         await get_msg(userbot, user_id, msg_id, link, retry_count, message)
-        await asyncio.sleep(15)
     finally:
         pass
 
@@ -231,82 +230,101 @@ async def batch_link(_, message):
         return
         
     join_button = InlineKeyboardButton("Join Channel", url="https://t.me/+7R-7p7jVoz9mM2M1")
-    keyboard = InlineKeyboardMarkup([[join_button]])
+    stop_button = InlineKeyboardButton("🚫 Stop Batch", callback_data=f"stop_batch_{user_id}")
+    keyboard = InlineKeyboardMarkup([[join_button], [stop_button]])
+    
     pin_msg = await app.send_message(
         user_id,
-        f"Batch process started ⚡\nProcessing: 0/{cl}\n\n**Powered by CHOSEN ONE ⚝**",
+        f"🚀 **Batch process started!**\n\n✅ **Processed:** 0/{cl}\n❌ **Failed:** 0\n⏳ **Status:** Initializing...",
         reply_markup=keyboard
     )
     await pin_msg.pin(both_sides=True)
 
     users_loop[user_id] = True
+    userbot = None
+    success_count = 0
+    fail_count = 0
+    
     try:
         userbot = await initialize_userbot(user_id)
+        
+        base_url = '/'.join(start_id.split('/')[:-1])
         
         for i in range(cs, cs + cl):
             if user_id not in users_loop or not users_loop[user_id]:
                 break
             
-            url = f"{'/'.join(start_id.split('/')[:-1])}/{i}"
+            url = f"{base_url}/{i}"
             link = get_link(url)
             if not link:
+                fail_count += 1
                 continue
             
             # Check link type
             is_special = any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage', 'telegram.me/c/', 'telegram.dog/c/'])
             if is_special and not userbot:
+                fail_count += 1
                 continue
             
-            msg = await app.send_message(message.chat.id, f"Processing {i}...")
             try:
-                await process_and_upload_link(userbot, user_id, msg.id, link, 0, message)
-                await asyncio.sleep(1) # Small delay to ensure sequential arrival in TG
+                # Process the message
+                await get_msg(userbot, user_id, None, link, 0, pin_msg)
+                success_count += 1
+                # Adaptive delay to avoid flood waits
+                await asyncio.sleep(1.5) 
+            except FloodWait as e:
+                await asyncio.sleep(e.value + 2)
+                # Retry once after flood wait
+                try:
+                    await get_msg(userbot, user_id, None, link, 0, pin_msg)
+                    success_count += 1
+                except:
+                    fail_count += 1
             except Exception as e:
-                await app.send_message(message.chat.id, f"Error at {i}: {e}")
-            finally:
-                await msg.delete()
-                # Update progress in pinned message
-                current_progress = i - cs + 1
+                print(f"Error at {i}: {e}")
+                fail_count += 1
+            
+            # Update progress every few messages or at the end to avoid spamming API
+            if (success_count + fail_count) % 2 == 0 or (success_count + fail_count) == cl:
                 try:
                     await pin_msg.edit_text(
-                        f"Batch process started ⚡\nProcessing: {current_progress}/{cl}\n\n**__Powered by CHOSEN ONE ⚝__**",
+                        f"🚀 **Batch process in progress...**\n\n✅ **Processed:** {success_count}/{cl}\n❌ **Failed:** {fail_count}\n⏳ **Current ID:** `{i}`\n\n**Powered by CHOSEN ONE ⚝**",
                         reply_markup=keyboard
                     )
                 except:
                     pass
 
-        await set_interval(user_id, interval_minutes=300)
+        final_status = "completed" if users_loop.get(user_id) else "stopped"
         await pin_msg.edit_text(
-            f"Batch completed successfully for {cl} messages 🎉\n\n**__Powered by CHOSEN ONE ⚝__**",
-            reply_markup=keyboard
+            f"✅ **Batch {final_status}!**\n\n✨ **Success:** {success_count}\n❌ **Failed:** {fail_count}\n📊 **Total:** {cl}\n\n**__Powered by CHOSEN ONE ⚝__**",
+            reply_markup=InlineKeyboardMarkup([[join_button]])
         )
-        await app.send_message(message.chat.id, "Batch completed successfully! 🎉")
+        await app.send_message(message.chat.id, f"Batch process {final_status}! ✨\nSuccess: {success_count} | Failed: {fail_count}")
 
     except Exception as e:
-        await app.send_message(message.chat.id, f"Error: {e}")
+        await app.send_message(message.chat.id, f"Critical Error: {e}")
     finally:
         users_loop.pop(user_id, None)
         if userbot:
             await userbot.stop()
 
-@app.on_message(filters.command("cancel"))
-async def stop_batch(_, message):
-    user_id = message.chat.id
-
-    # Check if there is an active batch process for the user
-    if user_id in users_loop and users_loop[user_id]:
-        users_loop[user_id] = False  # Set the loop status to False
-        await app.send_message(
-            message.chat.id, 
-            "Batch processing has been stopped successfully. You can start a new batch now if you want."
-        )
-    elif user_id in users_loop and not users_loop[user_id]:
-        await app.send_message(
-            message.chat.id, 
-            "The batch process was already stopped. No active batch to cancel."
-        )
+@app.on_callback_query(filters.regex(r"stop_batch_(\d+)"))
+async def stop_batch_callback(_, query):
+    user_id = int(query.matches[0].group(1))
+    if query.from_user.id != user_id:
+        return await query.answer("This is not your process!", show_alert=True)
+    
+    if user_id in users_loop:
+        users_loop[user_id] = False
+        await query.answer("Batch process stopping...", show_alert=True)
     else:
-        await app.send_message(
-            message.chat.id, 
-            "No active batch processing is running to cancel."
-        )
+        await query.answer("No active batch process found.", show_alert=True)
+
+@app.on_message(filters.command("cancel"))
+async def stop_batch_command(_, message):
+    user_id = message.chat.id
+    if user_id in users_loop:
+        users_loop[user_id] = False
+        await message.reply("Batch process stopping... 🛑")
+    else:
+        await message.reply("No active batch process to cancel.")

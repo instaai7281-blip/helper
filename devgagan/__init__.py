@@ -12,13 +12,15 @@
 # License: MIT License
 # ---------------------------------------------------
 
+print("DEBUG: devgagan/__init__.py started")
 import asyncio
 import logging
 from pyrogram import Client
 from pyrogram.enums import ParseMode 
+from pyrogram.types import BotCommand
 from motor.motor_asyncio import AsyncIOMotorClient
 import time
-from config import API_ID, API_HASH, BOT_TOKEN, STRING, STRINGS, MONGO_DB, MAX_CONCURRENT_TASKS
+from config import API_ID, API_HASH, BOT_TOKEN, STRING, STRINGS, MONGO_DB, MAX_CONCURRENT_TASKS, OWNER_ID, LOG_GROUP
 
 print("--- RestrictBot: Optimized Build v2.5 Loading ---")
 
@@ -36,7 +38,7 @@ app = Client(
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
-    workers=40,
+    workers=100,
     parse_mode=ParseMode.MARKDOWN,
     sleep_threshold=60
 )
@@ -45,7 +47,7 @@ app = Client(
 pro_clients = []
 if STRINGS:
     for i, session in enumerate(STRINGS):
-        pro_clients.append(Client(f"pro_client_{i}", api_id=API_ID, api_hash=API_HASH, session_string=session, workers=20, sleep_threshold=60))
+        pro_clients.append(Client(f"pro_client_{i}", api_id=API_ID, api_hash=API_HASH, session_string=session, workers=50, sleep_threshold=60))
     pro = pro_clients[0] # Backward compatibility
 else:
     pro = None
@@ -80,6 +82,32 @@ async def restrict_bot():
     getme = await app.get_me()
     BOT_ID = getme.id
     BOT_USERNAME = getme.username
+
+    # Set Bot Commands
+    await app.set_bot_commands([
+        BotCommand("start", "🚀 𝗦𝘁𝗮𝗿𝘁 𝘁𝗵𝗲 𝗯𝗼𝘁"),
+        BotCommand("batch", "🪄 𝗕𝘂𝗹𝗸 𝗲𝘅𝘁𝗿𝗮𝗰𝘁𝗶𝗼𝗻"),
+        BotCommand("cancel", "🚫 𝗖𝗮𝗻𝗰𝗲𝗹 𝗯𝗮𝘁𝗰𝗵"),
+        BotCommand("settings", "⚙️ 𝗖𝘂𝘀𝘁𝗼𝗺𝗶𝘇𝗲 𝘀𝗲𝘁𝘁𝗶𝗻𝗴𝘀"),
+        BotCommand("help", "❓ 𝗛𝗲𝗹𝗽 𝗴𝘂𝗶𝗱𝗲"),
+        BotCommand("login", "🔑 𝗔𝗰𝗰𝗲𝘀𝘀 𝘆𝗼𝘂𝗿 𝗮𝗰𝗰𝗼𝘂𝗻𝘁"),
+        BotCommand("logout", "🚪 𝗦𝗲𝗰𝘂𝗿𝗲 𝗲𝘅𝗶𝘁"),
+        BotCommand("plans", "💎 𝗣𝗿𝗲𝗺𝗶𝘂𝗺 𝗽𝗹𝗮𝗻𝘀"),
+        BotCommand("refer", "💞 𝗥𝗲𝗳𝗲𝗿 𝗬𝗼𝘂𝗿 𝗙𝗿𝗶𝗲𝗻𝗱𝘀"),
+        BotCommand("adl", "👻 𝗔𝘂𝗱𝗶𝗼 𝗱𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 (𝟯𝟬+ 𝘀𝗶𝘁𝗲𝘀)"),
+        BotCommand("dl", "💀 𝗩𝗶𝗱𝗲𝗼 𝗱𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 (𝟯𝟬+ 𝘀𝗶𝘁𝗲𝘀)"),
+        BotCommand("transfer", "💞 𝗚𝗶𝗳𝘁 𝗽𝗿𝗲𝗺𝗶𝘂𝗺"),
+        BotCommand("myplan", "⌛ 𝗦𝘂𝗯𝘀𝗰𝗿𝗶𝗽𝘁𝗶𝗼𝗻 𝗱𝗲𝘁𝗮𝗶𝗹𝘀"),
+        BotCommand("add", "➕ 𝗔𝗱𝗱 𝗽𝗿𝗲𝗺𝗶𝘂𝗺 𝘂𝘀𝗲𝗿"),
+        BotCommand("rem", "➖ 𝗥𝗲𝗺𝗼𝘃𝗲 𝗽𝗿𝗲𝗺𝗶𝘂𝗺 𝘂𝘀𝗲𝗿"),
+        BotCommand("session", "🧵 𝗣𝘆𝗿𝗼𝗴𝗿𝗮𝗺 𝘃𝟮 𝗴𝗲𝗻𝗲𝗿𝗮𝘁𝗼𝗿"),
+        BotCommand("stats", "📊 𝗕𝗼𝘁 𝘀𝘁𝗮𝘁𝗶𝘀𝘁𝗶𝗰𝘀"),
+        BotCommand("terms", "🥺 𝗧𝗲𝗿𝗺𝘀 & 𝗰𝗼𝗻𝗱𝗶𝘁𝗶𝗼𝗻𝘀"),
+        BotCommand("speedtest", "🚅 𝗦𝗽𝗲𝗲𝗱 𝘁𝗲𝘀𝘁"),
+        BotCommand("get", "🗄️ 𝗘𝘅𝗽𝗼𝗿𝘁 𝘂𝘀𝗲𝗿 𝗱𝗮𝘁𝗮"),
+        BotCommand("lock", "🔒 𝗣𝗿𝗼𝘁𝗲𝗰𝘁 𝗰𝗵𝗮𝗻𝗻𝗲𝗹"),
+        BotCommand("gcast", "⚡ 𝗕𝗿𝗼𝗮𝗱𝗰𝗮𝘀𝘁 𝗺𝗲𝘀𝘀𝗮𝗴𝗲")
+    ])
     if getme.last_name:
         BOT_NAME = getme.first_name + " " + getme.last_name
     else:
@@ -87,6 +115,19 @@ async def restrict_bot():
     if STRINGS:
         for client in pro_clients:
             await client.start()
+    
+    # Send startup message
+    try:
+        print(f"Attempting to send startup message to owner: {OWNER_ID[0]}")
+        startup_msg = "✅ **Bot Started Successfully!**\n\n🛡️ **Features Active:**\n- PDF Watermark\n- Media Filters\n- Rebranding Tag"
+        await app.send_message(OWNER_ID[0], startup_msg)
+        print("Startup message sent to owner.")
+        if LOG_GROUP:
+            print(f"Attempting to send startup message to log group: {LOG_GROUP}")
+            await app.send_message(int(LOG_GROUP), startup_msg)
+            print("Startup message sent to log group.")
+    except Exception as e:
+        print(f"Failed to send startup message: {e}")
 
 import random
 def get_client():
