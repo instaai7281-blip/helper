@@ -288,15 +288,17 @@ async def screenshot(video, duration, sender):
     try:
         # Validate inputs
         if duration <= 0:
-            print(f"[ERROR] Invalid duration: {duration}")
-            return None
+            duration = 10  # Fallback duration to allow seek
             
-        seek_time = max(int(duration) // 2, 1)
+        # To avoid black frames at start/end:
+        # If duration > 10, seek to 5 seconds. Otherwise seek to half or 1 second.
+        seek_time = 5 if duration > 10 else max(int(duration) // 2, 1)
         time_stamp = hhmmss(seek_time)
         out = f"thumb_{sender}_{int(time.time())}.jpg"
         
         print(f"[DEBUG] Creating thumbnail: seek_time={seek_time}, output={out}")
         
+        # Try with fast seek first (ss before -i)
         cmd = ["ffmpeg",
                "-ss", f"{time_stamp}", 
                "-i", f"{video}",
@@ -313,25 +315,63 @@ async def screenshot(video, duration, sender):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate()
+        await process.communicate()
         
-        if process.returncode != 0:
-            stderr_msg = stderr.decode().strip()[-200:]
-            print(f"[ERROR] FFmpeg failed (code {process.returncode}): {stderr_msg}")
-            return None
+        # If fast seek failed or produced empty file, try slow seek (ss after -i)
+        if not os.path.isfile(out) or os.path.getsize(out) == 0:
+            print("[DEBUG] Fast seek failed, trying slow seek...")
+            cmd = ["ffmpeg",
+                   "-i", f"{video}",
+                   "-ss", f"{time_stamp}", 
+                   "-frames:v", "1",
+                   "-q:v", "2",
+                   "-an",
+                   "-threads", "1",
+                   f"{out}",
+                   "-y"
+                  ]
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            await process.communicate()
             
-        if os.path.isfile(out):
+        # If both failed, try seeking to 2 seconds
+        if not os.path.isfile(out) or os.path.getsize(out) == 0:
+            print("[DEBUG] Seek to mid/5s failed, trying seek to 2 seconds...")
+            cmd = ["ffmpeg",
+                   "-i", f"{video}",
+                   "-ss", "00:00:02", 
+                   "-frames:v", "1",
+                   "-q:v", "2",
+                   "-an",
+                   "-threads", "1",
+                   f"{out}",
+                   "-y"
+                  ]
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            await process.communicate()
+
+        if os.path.isfile(out) and os.path.getsize(out) > 0:
             optimized_out = optimize_thumbnail(out)
             print(f"[SUCCESS] Thumbnail created and optimized: {optimized_out}")
             return optimized_out
         else:
-            print(f"[ERROR] Thumbnail file not created: {out}")
+            print(f"[ERROR] Thumbnail file not created or empty: {out}")
+            if os.path.isfile(out):
+                try:
+                    os.remove(out)
+                except Exception:
+                    pass
             return None
             
     except Exception as e:
         print(f"[CRITICAL] Screenshot exception: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return None
         
 last_update_time = time.time()

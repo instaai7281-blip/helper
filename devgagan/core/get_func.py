@@ -214,7 +214,7 @@ async def log_upload(user_id, file_type, file_msg, upload_method, duration=None,
 
 
 # Upload handler
-async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
+async def upload_media(sender, target_chat_id, file, caption, edit, topic_id, thumb=None):
     try:
         upload_method = await fetch_upload_method(sender)
         metadata = video_metadata(file)
@@ -224,25 +224,21 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id):
         height = metadata.get('height', 0)
         duration = metadata.get('duration', 0)
 
-        # ✅ Check for custom thumbnail first (for all media types)
-        thumb_path = thumbnail(sender)
-
-        # ✅ Fallback to auto-screenshot ONLY if it's a video and NO custom thumb exists
-        # REPLACE THIS in devgagan/core/get_func.py (Line 175-179)
-
-        if not thumb_path and file.lower().endswith(tuple(VIDEO_EXTENSIONS)):
-            try:
-                print(f"[DEBUG] Trying to create thumbnail for: {file}, duration: {duration}")
-                thumb_path = await screenshot(file, duration, sender)
-                if not thumb_path:
-                    print(f"[ERROR] Screenshot returned None for user {sender}")
-                else:
-                    print(f"[SUCCESS] Thumbnail created: {thumb_path}")
-            except Exception as e:
-                print(f"[ERROR] Screenshot exception for {sender}: {str(e)}")
-                import traceback
-                traceback.print_exc()
-                thumb_path = None
+        # Use passed thumb or retrieve/generate it
+        thumb_path = thumb
+        if not thumb_path:
+            thumb_path = thumbnail(sender)
+            if not thumb_path and file.lower().endswith(tuple(VIDEO_EXTENSIONS)) and not file.lower().endswith('.mp4'):
+                try:
+                    print(f"[DEBUG] Trying to create thumbnail for: {file}, duration: {duration}")
+                    thumb_path = await screenshot(file, duration, sender)
+                    if not thumb_path:
+                        print(f"[ERROR] Screenshot returned None for user {sender}")
+                    else:
+                        print(f"[SUCCESS] Thumbnail created: {thumb_path}")
+                except Exception as e:
+                    print(f"[ERROR] Screenshot exception for {sender}: {str(e)}")
+                    thumb_path = None
 
         ext = file.split('.')[-1].lower()
         raw_name = os.path.basename(file)
@@ -607,15 +603,26 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         if msg.document and not await is_enabled(sender, "document"):
             return
 
+        # Prepare thumbnail beforehand
+        thumb_path = thumbnail(sender)
+        file_extension = str(file).split('.')[-1].lower()
+        if not thumb_path and file_extension in VIDEO_EXTENSIONS and file_extension != 'mp4':
+            metadata = video_metadata(file)
+            duration = metadata.get('duration', 0)
+            try:
+                thumb_path = await screenshot(file, duration, sender)
+            except Exception as e:
+                print(f"[ERROR] Failed to auto-screenshot in get_msg: {e}")
+
         free_check = await chk_user(message, sender)
         if file_size > size_limit and (free_check == 0 or pro is None):
             await edit.delete()
-            await split_and_upload_file(app, sender, target_chat_id, file, caption, topic_id)
+            await split_and_upload_file(app, sender, target_chat_id, file, caption, topic_id, thumb=thumb_path)
             return
         elif file_size > size_limit:
             await handle_large_file(file, sender, edit, caption)
         else:
-            await upload_media(sender, target_chat_id, file, caption, edit, topic_id)
+            await upload_media(sender, target_chat_id, file, caption, edit, topic_id, thumb=thumb_path)
 
     except (ChannelBanned, ChannelInvalid, ChannelPrivate, ChatIdInvalid, ChatInvalid):
         await app.edit_message_text(sender, edit_id, "🌚 First do /login & then send me the Link again send /guide for more help")
@@ -1305,7 +1312,7 @@ async def handle_large_file(file, sender, edit, caption):
     
     # ✅ Handle thumbnail
     thumb_path = thumbnail(sender)
-    if not thumb_path and file_extension in VIDEO_EXTENSIONS:
+    if not thumb_path and file_extension in VIDEO_EXTENSIONS and file_extension != 'mp4':
         thumb_path = await screenshot(file, duration, sender)
     try:
         if file_extension in VIDEO_EXTENSIONS:
@@ -1604,7 +1611,7 @@ def dl_progress_callback(done, total, user_id):
 
 # split function .... ?( to handle gareeb bot coder jo string n lga paaye)
 
-async def split_and_upload_file(app, sender, target_chat_id, file_path, caption, topic_id):
+async def split_and_upload_file(app, sender, target_chat_id, file_path, caption, topic_id, thumb=None):
     if not os.path.exists(file_path):
         await app.send_message(sender, "❌ File not found!")
         return
@@ -1639,6 +1646,7 @@ async def split_and_upload_file(app, sender, target_chat_id, file_path, caption,
             edit = await app.send_message(target_chat_id, f"⬆️ Uploading part {part_number + 1}...")
             part_caption = f"{caption} \n\n**Part : {part_number + 1}**"
             await app.send_document(target_chat_id, document=part_file, caption=part_caption, reply_to_message_id=topic_id,
+                thumb=thumb,
                 progress=progress_bar,
                 progress_args=("╭─────────────────────╮\n│      **__Pyro Uploader__**\n├─────────────────────", edit, time.time())
             )
