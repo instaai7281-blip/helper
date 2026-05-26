@@ -513,6 +513,38 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
         if not msg or msg.service or msg.empty:
             return
 
+        # Apply filter checks in get_msg!
+        if msg.media == MessageMediaType.WEB_PAGE_PREVIEW or msg.text:
+            if not await is_enabled(sender, "text"):
+                await edit.edit("🔇 **Text is turned OFF in settings. Skipping...**")
+                await edit.delete(2)
+                return
+        elif msg.media:
+            if msg.video and not await is_enabled(sender, "video"):
+                await edit.edit("🔇 **Video is turned OFF in settings. Skipping...**")
+                await edit.delete(2)
+                return
+            if msg.document and not await is_enabled(sender, "document"):
+                await edit.edit("🔇 **Document is turned OFF in settings. Skipping...**")
+                await edit.delete(2)
+                return
+            if msg.photo and not await is_enabled(sender, "photo"):
+                await edit.edit("🔇 **Photo is turned OFF in settings. Skipping...**")
+                await edit.delete(2)
+                return
+            if msg.audio and not await is_enabled(sender, "audio"):
+                await edit.edit("🔇 **Audio is turned OFF in settings. Skipping...**")
+                await edit.delete(2)
+                return
+            if msg.voice and not await is_enabled(sender, "voice"):
+                await edit.edit("🔇 **Voice is turned OFF in settings. Skipping...**")
+                await edit.delete(2)
+                return
+            if msg.sticker and not await is_enabled(sender, "sticker"):
+                await edit.edit("🔇 **Sticker is turned OFF in settings. Skipping...**")
+                await edit.delete(2)
+                return
+
         # Special handling for protected content (Restrict Saving Content)
         # Main bots (app) cannot download protected content; only user accounts (userbots) can.
         if getattr(msg, "has_protected_content", False) and client == app:
@@ -818,6 +850,24 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
 
         if not msg or msg.empty:
             return False
+
+        # Apply filter checks in copy_message_with_chat_id!
+        if msg.media == MessageMediaType.WEB_PAGE_PREVIEW or msg.text:
+            if not await is_enabled(sender, "text"):
+                return True
+        elif msg.media:
+            if msg.video and not await is_enabled(sender, "video"):
+                return True
+            if msg.document and not await is_enabled(sender, "document"):
+                return True
+            if msg.photo and not await is_enabled(sender, "photo"):
+                return True
+            if msg.audio and not await is_enabled(sender, "audio"):
+                return True
+            if msg.voice and not await is_enabled(sender, "voice"):
+                return True
+            if msg.sticker and not await is_enabled(sender, "sticker"):
+                return True
 
         # If protected content, force extraction (return False here)
         if msg.has_protected_content:
