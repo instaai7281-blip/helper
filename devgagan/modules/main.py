@@ -371,10 +371,7 @@ async def execute_batch(user_id, base_url, cs, cl, is_tg_openmessage, freecheck)
                 url = f"{base_url}&message_id={i}"
             else:
                 url = f"{base_url}/{i}"
-            link = get_link(url)
-            if not link:
-                fail_count += 1
-                continue
+            link = url
             
             # Check link type
             is_special = any(x in link for x in ['t.me/b/', 't.me/c/', 'tg://openmessage', 'telegram.me/c/', 'telegram.dog/c/'])
