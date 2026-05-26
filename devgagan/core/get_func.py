@@ -829,11 +829,18 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
         # Force blockquote tag for PDF files
         if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
             orig_filename = msg.document.file_name or "document.pdf"
-            if not orig_filename.lower().endswith('@pdf_x9.pdf'):
-                base_name, ext = os.path.splitext(orig_filename)
-                formatted_filename = f"{base_name} @PDF_X9{ext}"
-            else:
-                formatted_filename = orig_filename
+            # Aggressively clean up original filename to remove others' tags
+            clean_filename_base = re.sub(r'@\w+', '', orig_filename)
+            clean_filename_base = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', clean_filename_base)
+            clean_filename_base = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', clean_filename_base)
+            clean_filename_base = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', clean_filename_base)
+            clean_filename_base = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', clean_filename_base)
+            clean_filename_base = re.sub(r'[ \-_]+', ' ', clean_filename_base).strip()
+            
+            base_name, ext = os.path.splitext(clean_filename_base)
+            if ext.lower() != '.pdf':
+                ext = '.pdf'
+            formatted_filename = f"{base_name.strip()} @PDF_X9{ext}".strip()
             final_caption = f"> **{formatted_filename}**\n> **➪ @PDF_X9 🦋 ❞**"
 
         topic_id = None
@@ -932,11 +939,18 @@ async def send_media_message(app, target_chat_id, msg, caption, topic_id):
         # Caption handling
         if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
             orig_filename = msg.document.file_name or "document.pdf"
-            if not orig_filename.lower().endswith('@pdf_x9.pdf'):
-                base_name, ext = os.path.splitext(orig_filename)
-                formatted_filename = f"{base_name} @PDF_X9{ext}"
-            else:
-                formatted_filename = orig_filename
+            # Aggressively clean up original filename to remove others' tags
+            clean_filename_base = re.sub(r'@\w+', '', orig_filename)
+            clean_filename_base = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', clean_filename_base)
+            clean_filename_base = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', clean_filename_base)
+            clean_filename_base = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', clean_filename_base)
+            clean_filename_base = re.sub(r'✧\s*𝚃𝙷𝙴\s*𝚂𝚃𝚄𝙳𝚈\s*𝚅𝙰𝚄𝙻𝚃\s*✧\s*🏝️?', '', clean_filename_base)
+            clean_filename_base = re.sub(r'[ \-_]+', ' ', clean_filename_base).strip()
+            
+            base_name, ext = os.path.splitext(clean_filename_base)
+            if ext.lower() != '.pdf':
+                ext = '.pdf'
+            formatted_filename = f"{base_name.strip()} @PDF_X9{ext}".strip()
             caption = f"> **{formatted_filename}**\n> **➪ @PDF_X9 🦋 ❞**"
         elif caption:
             # If caption exists → keep it same, just replace links if needed
@@ -1595,8 +1609,8 @@ async def rename_file(file, sender, caption=None):
     base_name = os.path.basename(base_name)
 
     # Apply text transformations
-    # Fully swap out any mentions for their own tag or a safe default
-    base_name = re.sub(r'@\w+', getattr(custom_rename_tag, '', '@Chosen_Onex'), base_name)
+    # Fully remove all other mentions so that only custom tag is present at the end
+    base_name = re.sub(r'@\w+', '', base_name)
     base_name = re.sub(r'(?i)[*_]*team[\s_\-\.]*jnc[*_]*', '', base_name)  # Remove team jnc
     base_name = re.sub(r'(?i)[*_]*team[\s_\-\.]*spay[*_]*', '', base_name) # Remove team spay
     base_name = re.sub(r'(?i)[*_]*let\'?s\s*help[*_]*', '', base_name)  # Remove let's help
