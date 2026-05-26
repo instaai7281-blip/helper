@@ -250,7 +250,8 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id, th
 
         # ✅ Generate cleaned caption for user post
         if file.lower().endswith('.pdf'):
-            caption = "> **➪ @PDF_X9 🦋 ❞**"
+            filename = os.path.basename(file)
+            caption = f"> **{filename}**\n> **➪ @PDF_X9 🦋 ❞**"
         else:
             caption = format_caption(caption, sender, custom_caption=None)
 
@@ -574,11 +575,13 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
             return
 
         caption = await get_final_caption(msg, sender)
-        if file and str(file).lower().endswith('.pdf'):
-            caption = "> **➪ @PDF_X9 🦋 ❞**"
 
         # Rename file
         file = await rename_file(file, sender)
+
+        if file and str(file).lower().endswith('.pdf'):
+            filename = os.path.basename(file)
+            caption = f"> **{filename}**\n> **➪ @PDF_X9 🦋 ❞**"
 
         # Apply PDF Watermark if applicable
         if file and str(file).lower().endswith('.pdf'):
@@ -825,7 +828,13 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
         
         # Force blockquote tag for PDF files
         if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
-            final_caption = "> **➪ @PDF_X9 🦋 ❞**"
+            orig_filename = msg.document.file_name or "document.pdf"
+            if not orig_filename.lower().endswith('@pdf_x9.pdf'):
+                base_name, ext = os.path.splitext(orig_filename)
+                formatted_filename = f"{base_name} @PDF_X9{ext}"
+            else:
+                formatted_filename = orig_filename
+            final_caption = f"> **{formatted_filename}**\n> **➪ @PDF_X9 🦋 ❞**"
 
         topic_id = None
         if '/' in str(target_chat_id):
@@ -868,10 +877,6 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
             custom_caption = get_user_caption_preference(sender)
             final_caption = format_caption(msg.caption.markdown if msg.caption else "", sender, custom_caption)
             
-            # Force blockquote tag for PDF files in userbot copy
-            if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
-                final_caption = "> **➪ @PDF_X9 🦋 ❞**"
-            
             file = await userbot.download_media(
                 msg,
                 progress=progress_bar,
@@ -881,6 +886,10 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
                 return False
 
             file = await rename_file(file, sender)
+
+            if file and str(file).lower().endswith('.pdf'):
+                filename = os.path.basename(file)
+                final_caption = f"> **{filename}**\n> **➪ @PDF_X9 🦋 ❞**"
             file_size = os.path.getsize(file)
 
             if msg.photo:
@@ -922,7 +931,13 @@ async def send_media_message(app, target_chat_id, msg, caption, topic_id):
 
         # Caption handling
         if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
-            caption = "> **➪ @PDF_X9 🦋 ❞**"
+            orig_filename = msg.document.file_name or "document.pdf"
+            if not orig_filename.lower().endswith('@pdf_x9.pdf'):
+                base_name, ext = os.path.splitext(orig_filename)
+                formatted_filename = f"{base_name} @PDF_X9{ext}"
+            else:
+                formatted_filename = orig_filename
+            caption = f"> **{formatted_filename}**\n> **➪ @PDF_X9 🦋 ❞**"
         elif caption:
             # If caption exists → keep it same, just replace links if needed
             caption = re.sub(
@@ -1002,7 +1017,7 @@ def format_caption(original_caption, sender, custom_caption):
         original_caption = ""
 
     if "➪ @PDF_X9 🦋 ❞" in original_caption:
-        return "> **➪ @PDF_X9 🦋 ❞**"
+        return original_caption
 
     # ✅ Clean fancy characters and replace emojis
     #original_caption = replace_fancy_and_emoji(original_caption)
