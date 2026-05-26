@@ -563,6 +563,8 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
             return
 
         caption = await get_final_caption(msg, sender)
+        if file and str(file).lower().endswith('.pdf'):
+            caption = "> ➪ @PDF_X9 🦋 ❞"
 
         # Rename file
         file = await rename_file(file, sender)
@@ -776,6 +778,10 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
 
         custom_caption = get_user_caption_preference(sender)
         final_caption = format_caption(msg.caption or '', sender, custom_caption)
+        
+        # Force blockquote tag for PDF files
+        if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
+            final_caption = "> ➪ @PDF_X9 🦋 ❞"
 
         topic_id = None
         if '/' in str(target_chat_id):
@@ -792,6 +798,72 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
     except Exception as e:
         print(f"App copy failed: {e}")
 
+    # Fallback to userbot if app copy fails
+    if userbot:
+        try:
+            await edit.edit("Trying extraction via userbot... ⚡")
+            
+            # Resolve chat_id if it's a username string
+            if isinstance(chat_id, str) and not chat_id.startswith("-") and not chat_id.isdigit():
+                try:
+                    chat_entity = await userbot.get_entity(chat_id)
+                    resolved_chat_id = chat_entity.id
+                except Exception:
+                    resolved_chat_id = chat_id
+            else:
+                resolved_chat_id = chat_id
+
+            msg = await userbot.get_messages(resolved_chat_id, message_id)
+            if not msg or msg.empty:
+                return False
+
+            if msg.text:
+                await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
+                return True
+
+            custom_caption = get_user_caption_preference(sender)
+            final_caption = format_caption(msg.caption.markdown if msg.caption else "", sender, custom_caption)
+            
+            # Force blockquote tag for PDF files in userbot copy
+            if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
+                final_caption = "> ➪ @PDF_X9 🦋 ❞"
+            
+            file = await userbot.download_media(
+                msg,
+                progress=progress_bar,
+                progress_args=("╭─────────────────────╮\n│      **__Downloading__...**\n├─────────────────────", edit, time.time())
+            )
+            if not file:
+                return False
+
+            file = await rename_file(file, sender)
+            file_size = os.path.getsize(file)
+
+            if msg.photo:
+                await app.send_photo(target_chat_id, file, caption=None, reply_to_message_id=topic_id)
+            elif msg.video or msg.document:
+                freecheck = await chk_user(None, sender)
+                if file_size > size_limit and (freecheck == 0 or pro is None):
+                    await split_and_upload_file(app, sender, target_chat_id, file, final_caption, topic_id)
+                elif file_size > size_limit:
+                    await handle_large_file(file, sender, edit, final_caption)
+                else:
+                    await upload_media(sender, target_chat_id, file, final_caption, edit, topic_id)
+            elif msg.audio:
+                await app.send_audio(target_chat_id, file, caption=final_caption, reply_to_message_id=topic_id)
+            elif msg.voice:
+                await app.send_voice(target_chat_id, file, reply_to_message_id=topic_id)
+            elif msg.sticker:
+                await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
+            
+            return True
+        except Exception as e:
+            print(f"Userbot extraction failed: {e}")
+            return False
+        finally:
+            if file and os.path.exists(file):
+                os.remove(file)
+    
     return False
 
 async def send_media_message(app, target_chat_id, msg, caption, topic_id):
@@ -1436,6 +1508,9 @@ async def rename_file(file, sender, caption=None):
     directory = os.path.dirname(file)
     filename = os.path.basename(file)
     base_name, ext = os.path.splitext(filename)
+    
+    if ext and ext.lower() == '.pdf':
+        custom_rename_tag = '@PDF_X9'
     
     ext = ext if ext and len(ext) <= 6 else ".mp4"
     original_base = base_name
