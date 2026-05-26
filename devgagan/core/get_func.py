@@ -385,13 +385,21 @@ async def upload_media(sender, target_chat_id, file, caption, edit, topic_id, th
 
 async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: str, i: int = 0, message: Message = None):
     try:
+        # If edit_id is None (e.g. in batch mode), create a temporary message to act as edit message
+        edit = ''
+        if edit_id is None:
+            try:
+                edit = await app.send_message(sender, "Processing batch link... ⏳")
+                edit_id = edit.id
+            except Exception as e:
+                print(f"Failed to create batch status message: {e}")
+
         # Sanitize the message link
         msg_link = msg_link.split("?single")[0]
         chat, msg_id = None, None
         saved_channel_ids = load_saved_channel_ids()
         size_limit = 2 * 1024 * 1024 * 1024  # 1.99 GB size limit
         file = ''
-        edit = ''
         # Extract chat and message ID for various Telegram link formats
         if 't.me/c/' in msg_link or 't.me/b/' in msg_link:
             parts = [p for p in msg_link.split("/") if p]
@@ -646,23 +654,56 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
             await edit.delete(1)
         
 async def clone_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
+    edit = None
+    try:
+        edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning...")
+    except Exception:
+        try:
+            edit = await app.edit_message_text(msg.chat.id, edit_id, "Cloning...")
+        except Exception:
+            pass
     devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
     await devgaganin.copy(log_group)
-    await edit.delete()
+    if edit:
+        try:
+            await edit.delete()
+        except Exception:
+            pass
 
 async def clone_text_message(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning text message...")
+    edit = None
+    try:
+        edit = await app.edit_message_text(target_chat_id, edit_id, "Cloning text message...")
+    except Exception:
+        try:
+            edit = await app.edit_message_text(msg.chat.id, edit_id, "Cloning text message...")
+        except Exception:
+            pass
     devgaganin = await app.send_message(target_chat_id, msg.text.markdown, reply_to_message_id=topic_id)
     await devgaganin.copy(log_group)
-    await edit.delete()
+    if edit:
+        try:
+            await edit.delete()
+        except Exception:
+            pass
 
 
 async def handle_sticker(app, msg, target_chat_id, topic_id, edit_id, log_group):
-    edit = await app.edit_message_text(target_chat_id, edit_id, "Handling sticker...")
+    edit = None
+    try:
+        edit = await app.edit_message_text(target_chat_id, edit_id, "Handling sticker...")
+    except Exception:
+        try:
+            edit = await app.edit_message_text(msg.chat.id, edit_id, "Handling sticker...")
+        except Exception:
+            pass
     result = await app.send_sticker(target_chat_id, msg.sticker.file_id, reply_to_message_id=topic_id)
     await result.copy(log_group)
-    await edit.delete()
+    if edit:
+        try:
+            await edit.delete()
+        except Exception:
+            pass
 
 
 

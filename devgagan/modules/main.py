@@ -197,10 +197,31 @@ async def batch_link(_, message):
         )
         start = await app.ask(message.chat.id, "🎯 Send The Link For Where I Need To Start Process From \n\n> You Have Only 3 Tries")
         start_id = start.text.strip().rstrip('/')
-        s = start_id.split("/")[-1]
-        if s.isdigit():
-            cs = int(s)
-            break
+        
+        # Clean query parameters except for tg:// openmessage
+        if 'tg://' not in start_id:
+            start_id = start_id.split('?')[0]
+
+        is_tg_openmessage = False
+        if 'tg://openmessage' in start_id:
+            import urllib.parse
+            parsed_url = urllib.parse.urlparse(start_id)
+            params = urllib.parse.parse_qs(parsed_url.query)
+            msg_id_val = params.get("message_id", [None])[0]
+            if msg_id_val and msg_id_val.isdigit():
+                cs = int(msg_id_val)
+                # Rebuild parameters without message_id
+                remaining_params = "&".join([f"{k}={v[0]}" for k, v in params.items() if k != 'message_id'])
+                base_url = f"tg://openmessage?{remaining_params}"
+                is_tg_openmessage = True
+                break
+        else:
+            s = start_id.split("/")[-1]
+            if s.isdigit():
+                cs = int(s)
+                base_url = '/'.join(start_id.split('/')[:-1])
+                is_tg_openmessage = False
+                break
         await app.send_message(message.chat.id, "Invalid link. Please send again ...")
     else:
         await app.send_message(message.chat.id, "Maximum attempts exceeded. Try later.")
@@ -249,13 +270,14 @@ async def batch_link(_, message):
     try:
         userbot = await initialize_userbot(user_id)
         
-        base_url = '/'.join(start_id.split('/')[:-1])
-        
         for i in range(cs, cs + cl):
             if user_id not in users_loop or not users_loop[user_id]:
                 break
             
-            url = f"{base_url}/{i}"
+            if is_tg_openmessage:
+                url = f"{base_url}&message_id={i}"
+            else:
+                url = f"{base_url}/{i}"
             link = get_link(url)
             if not link:
                 fail_count += 1
