@@ -82,7 +82,7 @@ def clean_text_advanced(text, user_tag, delete_words=None, replacements=None):
     text = re.sub(r'[)}\]]', '〙', text)
     
     # Rebrand extraction markers
-    text = re.sub(r'(?i)(Extracted|Download|Upload|Forwarded)[\s_]*By[\s_:➤>–\-]*[^\n]*', r'<b>Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss</b>', text)
+    text = re.sub(r'(?i)(Extracted|Download|Upload|Forwarded)[\s_]*By[\s_:➤>–\-]*[^\n]*', r'<b>@PDF_X9</b>', text)
     
     if delete_words:
         for word in delete_words:
@@ -564,7 +564,7 @@ async def get_msg(userbot: TelegramClient, sender: int, edit_id: int, msg_link: 
 
         caption = await get_final_caption(msg, sender)
         if file and str(file).lower().endswith('.pdf'):
-            caption = "> ➪ @PDF_X9 🦋 ❞"
+            caption = "> **➪ @PDF_X9 🦋 ❞**"
 
         # Rename file
         file = await rename_file(file, sender)
@@ -705,7 +705,7 @@ async def get_final_caption(msg, sender):
     # ✅ Aggressive text cleanup: remove anything after an @mention or links entirely if they denote other sources
     # For captions, user asked to only retain their tag, removing any other mentions.
     # We replace any @mention with the custom renaming tag or a default if not set.
-    user_tag = custom_caption if custom_caption else '**🖤 Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**'
+    user_tag = custom_caption if custom_caption else '**➪ @PDF_X9 🦋 ❞**'
     final_caption = re.sub(r'@\w+', user_tag, final_caption)
 
     # Replace all links with your channel link
@@ -781,7 +781,7 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
         
         # Force blockquote tag for PDF files
         if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
-            final_caption = "> ➪ @PDF_X9 🦋 ❞"
+            final_caption = "> **➪ @PDF_X9 🦋 ❞**"
 
         topic_id = None
         if '/' in str(target_chat_id):
@@ -826,7 +826,7 @@ async def copy_message_with_chat_id(app, userbot, sender, chat_id, message_id, e
             
             # Force blockquote tag for PDF files in userbot copy
             if msg.document and ((msg.document.file_name and msg.document.file_name.lower().endswith('.pdf')) or msg.document.mime_type == 'application/pdf'):
-                final_caption = "> ➪ @PDF_X9 🦋 ❞"
+                final_caption = "> **➪ @PDF_X9 🦋 ❞**"
             
             file = await userbot.download_media(
                 msg,
@@ -968,7 +968,7 @@ def format_caption(original_caption, sender, custom_caption):
     original_caption = re.sub(r'#\S+', '', original_caption)
 
     # ✅ Replace @mentions aggressively
-    user_tag = custom_caption if custom_caption else '**🖤 Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**'
+    user_tag = custom_caption if custom_caption else '**➪ @PDF_X9 🦋 ❞**'
     original_caption = re.sub(r'@\w+', user_tag, original_caption)
 
     # ✅ Replace telegram links
@@ -993,7 +993,7 @@ def format_caption(original_caption, sender, custom_caption):
     original_caption = re.sub(
         r'(📩)?\s*(Downloaded[\s_]*By)\s*[:➤>–\-]*\s*.*',
 
-        r'**🖤 Sᴛꪮʟᴇɴ Hᴀᴘᴘɪɴᴇss ⚝**',
+        r'**➪ @PDF_X9 🦋 ❞**',
         original_caption,
         flags=re.IGNORECASE
     )
