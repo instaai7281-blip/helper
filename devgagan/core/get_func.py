@@ -1090,9 +1090,6 @@ def format_caption(original_caption, sender, custom_caption, filename=None):
     original_caption = original_caption.replace("➪ @PDF_X9 🦋 ❞", "⚝ 𝗝𝘂𝘀𝘁 𝗙ꪮ𝗿 𝗬ꪮ𝘂...💗")
     original_caption = original_caption.replace("@PDF_X9", "⚝ 𝗝𝘂𝘀𝘁 𝗙ꪮ𝗿 𝗬ꪮ𝘂...💗")
 
-    if "⚝ 𝗝𝘂𝘀𝘁 𝗙ꪮ𝗿 𝗬ꪮ𝘂...💗" in original_caption:
-        return original_caption
-
     # ✅ Clean fancy characters and replace emojis
     #original_caption = replace_fancy_and_emoji(original_caption)
 
