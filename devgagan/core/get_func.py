@@ -1250,6 +1250,12 @@ def apply_custom_caption_placeholders(custom_caption, original_caption, filename
     if not custom_caption:
         return original_caption
     
+    # Prevent duplicate custom caption if it's already at the end of the original caption
+    norm_custom = custom_caption.strip().replace("\n", "").replace(" ", "")
+    norm_orig = original_caption.strip().replace("\n", "").replace(" ", "")
+    if norm_custom and norm_orig.endswith(norm_custom):
+        return original_caption
+    
     # Clean original filename for display
     filename_clean = filename or ""
     if "." in filename_clean:
